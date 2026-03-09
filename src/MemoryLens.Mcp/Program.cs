@@ -11,6 +11,7 @@ builder.Logging.AddConsole(options =>
 
 builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
 builder.Services.AddSingleton<DotMemoryToolManager>();
+builder.Services.AddSingleton<ProcessFilter>();
 
 builder.Services
     .AddMcpServer()
