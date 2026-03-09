@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MemoryLens.Mcp/MemoryLens.Mcp.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MemoryLens.Mcp.Tests/MemoryLens.Mcp.Tests.csproj" />
+  </Folder>
+</Solution>

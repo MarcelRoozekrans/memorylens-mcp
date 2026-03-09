@@ -1,0 +1,25 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "memorylens-mcp",
+  "description": "On-demand .NET memory profiling with concrete code fix suggestions — powered by JetBrains dotMemory",
+  "version": "0.1.0",
+  "owner": {
+    "name": "Marcel Roozekrans"
+  },
+  "plugins": [
+    {
+      "name": "memorylens",
+      "source": "./",
+      "description": "Memory profiling MCP server with built-in rules and AI-actionable code suggestions for .NET applications",
+      "version": "0.1.0",
+      "author": {
+        "name": "Marcel Roozekrans"
+      },
+      "repository": "https://github.com/MarcelRoozekrans/memorylens-mcp",
+      "license": "MIT",
+      "keywords": ["memory", "profiling", "dotmemory", "mcp", "dotnet", "leak-detection"],
+      "category": "code-quality",
+      "tags": ["memory", "profiling", "dotnet", "mcp"]
+    }
+  ]
+}
