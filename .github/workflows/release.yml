@@ -22,7 +22,8 @@ jobs:
           versionSpec: '6.6.x'
       - uses: gittools/actions/gitversion/execute@v4.2.0
         id: gitversion
-      - run: dotnet build -c Release /p:Version=${{ steps.gitversion.outputs.semVer }}
+      - run: dotnet build -c Release -p:Version=${{ steps.gitversion.outputs.semVer }}
+      - run: dotnet pack src/MemoryLens.Mcp/MemoryLens.Mcp.csproj -c Release --no-build -p:PackageVersion=${{ steps.gitversion.outputs.semVer }} -o ./nupkg
       - name: Generate changelog
         id: changelog
         uses: requarks/changelog-action@v1
