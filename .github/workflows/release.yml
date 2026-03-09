@@ -24,6 +24,8 @@ jobs:
         id: gitversion
       - run: dotnet build -c Release -p:Version=${{ steps.gitversion.outputs.semVer }}
       - run: dotnet pack src/MemoryLens.Mcp/MemoryLens.Mcp.csproj -c Release --no-build -p:PackageVersion=${{ steps.gitversion.outputs.semVer }} -o ./nupkg
+      - name: Push to NuGet
+        run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
       - name: Generate changelog
         id: changelog
         uses: requarks/changelog-action@v1
@@ -34,4 +36,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body: ${{ steps.changelog.outputs.changes }}
+          files: ./nupkg/*.nupkg
           token: ${{ secrets.GITHUB_TOKEN }}
