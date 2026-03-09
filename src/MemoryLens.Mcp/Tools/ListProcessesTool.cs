@@ -1,4 +1,6 @@
+#pragma warning disable MA0048 // File name must match type name - intentional companion types
 using System.ComponentModel;
+using System.Globalization;
 using System.Text.Json;
 using MemoryLens.Mcp.Profiler;
 using ModelContextProtocol.Server;
@@ -16,7 +18,7 @@ public class ListProcessesTool(IProcessRunner processRunner, ProcessFilter proce
         CancellationToken ct = default)
     {
         var result = await processRunner.RunAsync(
-            "dotnet", "dotmemory list-processes", ct);
+            "dotnet", "dotmemory list-processes", ct).ConfigureAwait(false);
 
         if (result.ExitCode != 0)
             return $"Failed to list processes: {result.Error}";
@@ -37,7 +39,7 @@ public class ListProcessesTool(IProcessRunner processRunner, ProcessFilter proce
         foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
             var parts = line.Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 2 && int.TryParse(parts[0], out var pid))
+            if (parts.Length >= 2 && int.TryParse(parts[0], CultureInfo.InvariantCulture, out var pid))
             {
                 yield return new DotNetProcess(pid, parts[1].Trim(), "");
             }

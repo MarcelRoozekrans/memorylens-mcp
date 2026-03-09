@@ -12,7 +12,7 @@ public class SnapshotManagerTests
         var filter = new ProcessFilter();
         var manager = new SnapshotManager(runner, filter);
 
-        var result = await manager.TakeSnapshotAsync(pid: 1234);
+        var result = await manager.TakeSnapshotAsync(pid: 1234, ct: TestContext.Current.CancellationToken);
 
         Assert.True(result.Success);
         Assert.NotNull(result.SnapshotId);
@@ -26,7 +26,7 @@ public class SnapshotManagerTests
         var filter = new ProcessFilter();
         var manager = new SnapshotManager(runner, filter);
 
-        var result = await manager.TakeSnapshotAsync(processName: "devenv");
+        var result = await manager.TakeSnapshotAsync(processName: "devenv", ct: TestContext.Current.CancellationToken);
 
         Assert.False(result.Success);
         Assert.Contains("excluded", result.Error!);
@@ -39,7 +39,7 @@ public class SnapshotManagerTests
         var filter = new ProcessFilter();
         var manager = new SnapshotManager(runner, filter);
 
-        var result = await manager.TakeSnapshotAsync(processName: "MyApp");
+        var result = await manager.TakeSnapshotAsync(processName: "MyApp", ct: TestContext.Current.CancellationToken);
 
         Assert.True(result.Success);
         Assert.NotNull(result.SnapshotId);
@@ -52,7 +52,7 @@ public class SnapshotManagerTests
         var filter = new ProcessFilter();
         var manager = new SnapshotManager(runner, filter);
 
-        var result = await manager.TakeSnapshotAsync(command: "dotnet run --project MyApp");
+        var result = await manager.TakeSnapshotAsync(command: "dotnet run --project MyApp", ct: TestContext.Current.CancellationToken);
 
         Assert.True(result.Success);
         Assert.NotNull(result.SnapshotId);
@@ -65,7 +65,7 @@ public class SnapshotManagerTests
         var filter = new ProcessFilter();
         var manager = new SnapshotManager(runner, filter);
 
-        var result = await manager.TakeSnapshotAsync(pid: 1234);
+        var result = await manager.TakeSnapshotAsync(pid: 1234, ct: TestContext.Current.CancellationToken);
 
         Assert.False(result.Success);
         Assert.Contains("dotnet-dotmemory failed", result.Error!);

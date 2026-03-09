@@ -17,6 +17,7 @@ builder.Services.AddSingleton<ProcessFilter>();
 builder.Services.AddSingleton<SnapshotManager>();
 builder.Services.AddSingleton<MemoryLensConfig>(sp =>
     ConfigLoader.LoadFromPath(Path.Combine(Directory.GetCurrentDirectory(), ".memorylens.json")));
+builder.Services.AddSingleton<IDotMemoryAnalyzer, DotMemoryAnalyzer>();
 builder.Services.AddSingleton<AnalysisEngine>();
 
 builder.Services
@@ -24,4 +25,4 @@ builder.Services
     .WithStdioServerTransport()
     .WithToolsFromAssembly();
 
-await builder.Build().RunAsync();
+await builder.Build().RunAsync().ConfigureAwait(false);

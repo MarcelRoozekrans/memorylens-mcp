@@ -1,3 +1,5 @@
+using MemoryLens.Mcp.Analysis;
+
 namespace MemoryLens.Mcp.Rules;
 
 public record SnapshotAnalysisContext(
@@ -6,4 +8,15 @@ public record SnapshotAnalysisContext(
     string? BeforePath,
     string? AfterPath,
     bool IsComparison,
-    string? WorkingDirectory);
+    string? WorkingDirectory)
+{
+    /// <summary>
+    /// Parsed snapshot data (single snapshot or the "after" snapshot for comparisons).
+    /// </summary>
+    public SnapshotData? Data { get; init; }
+
+    /// <summary>
+    /// Comparison data when analyzing two snapshots. Only set when IsComparison is true.
+    /// </summary>
+    public ComparisonData? Comparison { get; init; }
+}

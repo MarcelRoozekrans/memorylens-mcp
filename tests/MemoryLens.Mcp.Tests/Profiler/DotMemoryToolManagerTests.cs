@@ -12,7 +12,7 @@ public class DotMemoryToolManagerTests
             exitCode: 0,
             output: "dotnet-dotmemory  2024.3.0  dotnet-dotmemory"));
 
-        var result = await manager.EnsureInstalledAsync();
+        var result = await manager.EnsureInstalledAsync(TestContext.Current.CancellationToken);
 
         Assert.True(result.IsInstalled);
         Assert.Contains("2024.3.0", result.Version);
@@ -25,7 +25,7 @@ public class DotMemoryToolManagerTests
         runner.SetNextResult(exitCode: 0, output: "Tool 'dotnet-dotmemory' was successfully installed.");
         var manager = new DotMemoryToolManager(runner);
 
-        var result = await manager.EnsureInstalledAsync();
+        var result = await manager.EnsureInstalledAsync(TestContext.Current.CancellationToken);
 
         Assert.True(result.IsInstalled);
     }

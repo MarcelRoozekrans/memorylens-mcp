@@ -19,7 +19,7 @@ public class CompareSnapshotsTool(SnapshotManager snapshotManager)
         [Description("Seconds to wait between before and after snapshots (default: 10)")] int? delaySeconds = null,
         CancellationToken ct = default)
     {
-        var result = await snapshotManager.CompareSnapshotsAsync(pid, processName, command, delaySeconds, ct);
+        var result = await snapshotManager.CompareSnapshotsAsync(pid, processName, command, delaySeconds, ct).ConfigureAwait(false);
 
         return JsonSerializer.Serialize(result, new JsonSerializerOptions
         {

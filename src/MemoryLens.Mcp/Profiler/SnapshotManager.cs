@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace MemoryLens.Mcp.Profiler;
 
 public class SnapshotManager(IProcessRunner processRunner, ProcessFilter processFilter)
@@ -16,7 +18,7 @@ public class SnapshotManager(IProcessRunner processRunner, ProcessFilter process
 
         Directory.CreateDirectory(_snapshotDir);
 
-        var snapshotId = Guid.NewGuid().ToString("N")[..8];
+        var snapshotId = Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture)[..8];
         var snapshotName = $"snapshot-{snapshotId}";
 
         string arguments;
@@ -27,16 +29,16 @@ public class SnapshotManager(IProcessRunner processRunner, ProcessFilter process
         }
         else
         {
-            var target = pid.HasValue ? pid.Value.ToString() : processName!;
+            var target = pid.HasValue ? pid.Value.ToString(CultureInfo.InvariantCulture) : processName!;
             arguments = $"get-snapshot {target} --save-to-dir={_snapshotDir} --snapshot-name={snapshotName}";
         }
 
         if (durationSeconds.HasValue && durationSeconds.Value > 0)
         {
-            await Task.Delay(TimeSpan.FromSeconds(durationSeconds.Value), ct);
+            await Task.Delay(TimeSpan.FromSeconds(durationSeconds.Value), ct).ConfigureAwait(false);
         }
 
-        var result = await processRunner.RunAsync("dotnet-dotmemory", arguments, ct);
+        var result = await processRunner.RunAsync("dotnet-dotmemory", arguments, ct).ConfigureAwait(false);
 
         if (result.ExitCode != 0)
             return new SnapshotResult(false, null, null, $"dotnet-dotmemory failed: {result.Error}");
@@ -64,7 +66,7 @@ public class SnapshotManager(IProcessRunner processRunner, ProcessFilter process
 
         // Take before snapshot
         var beforeArgs = BuildSnapshotArguments(pid, processName, command, beforeName);
-        var beforeResult = await processRunner.RunAsync("dotnet-dotmemory", beforeArgs, ct);
+        var beforeResult = await processRunner.RunAsync("dotnet-dotmemory", beforeArgs, ct).ConfigureAwait(false);
 
         if (beforeResult.ExitCode != 0)
             return new ComparisonResult(false, null, null, null, 0, $"Before snapshot failed: {beforeResult.Error}");
@@ -74,11 +76,11 @@ public class SnapshotManager(IProcessRunner processRunner, ProcessFilter process
         // Wait between snapshots
         var delay = delaySeconds ?? 10;
         if (delay > 0)
-            await Task.Delay(TimeSpan.FromSeconds(delay), ct);
+            await Task.Delay(TimeSpan.FromSeconds(delay), ct).ConfigureAwait(false);
 
         // Take after snapshot
         var afterArgs = BuildSnapshotArguments(pid, processName, command, afterName);
-        var afterResult = await processRunner.RunAsync("dotnet-dotmemory", afterArgs, ct);
+        var afterResult = await processRunner.RunAsync("dotnet-dotmemory", afterArgs, ct).ConfigureAwait(false);
 
         if (afterResult.ExitCode != 0)
             return new ComparisonResult(false, comparisonId, beforePath, null, 1, $"After snapshot failed: {afterResult.Error}");
@@ -93,7 +95,7 @@ public class SnapshotManager(IProcessRunner processRunner, ProcessFilter process
         if (command is not null)
             return $"start --save-to-dir={_snapshotDir} --snapshot-name={snapshotName} -- {command}";
 
-        var target = pid.HasValue ? pid.Value.ToString() : processName!;
+        var target = pid.HasValue ? pid.Value.ToString(CultureInfo.InvariantCulture) : processName!;
         return $"get-snapshot {target} --save-to-dir={_snapshotDir} --snapshot-name={snapshotName}";
     }
 

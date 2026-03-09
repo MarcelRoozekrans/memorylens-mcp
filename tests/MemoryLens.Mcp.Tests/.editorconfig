@@ -1,0 +1,15 @@
+[*.cs]
+# MA0006: Use string.Equals — these fire on xUnit Assert.Equal and lambda predicates, not real string comparisons
+dotnet_diagnostic.MA0006.severity = none
+
+# MA0074: Use StringComparison overload for Contains — fires on xUnit Assert.Contains which doesn't have that overload
+dotnet_diagnostic.MA0074.severity = none
+
+# MA0002: Missing IEqualityComparer — fires on Dictionary/LINQ usage inside test assertions
+dotnet_diagnostic.MA0002.severity = none
+
+# MA0004: ConfigureAwait(false) — not needed in test code
+dotnet_diagnostic.MA0004.severity = none
+
+# HLQ005: Avoid Single() — false positive on xUnit Assert.Single(), not LINQ Single()
+dotnet_diagnostic.HLQ005.severity = none

@@ -12,7 +12,7 @@ public class EnsureDotMemoryTool(DotMemoryToolManager toolManager)
         "Call this before any profiling operation.")]
     public async Task<string> ensure_dotmemory(CancellationToken ct)
     {
-        var status = await toolManager.EnsureInstalledAsync(ct);
+        var status = await toolManager.EnsureInstalledAsync(ct).ConfigureAwait(false);
         return status.Message;
     }
 }

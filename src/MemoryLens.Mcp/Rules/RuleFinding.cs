@@ -1,3 +1,4 @@
+#pragma warning disable MA0048 // File name must match type name - intentional companion types
 namespace MemoryLens.Mcp.Rules;
 
 public record RuleFinding(

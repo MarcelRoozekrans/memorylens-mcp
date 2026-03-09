@@ -25,7 +25,7 @@ public class AnalyzeTool(AnalysisEngine analysisEngine)
         var context = new SnapshotAnalysisContext(
             snapshotId, snapshotPath, beforePath, afterPath, isComparison, workingDirectory);
 
-        var findings = await analysisEngine.AnalyzeAsync(context, ct);
+        var findings = await analysisEngine.AnalyzeAsync(context, ct).ConfigureAwait(false);
 
         return JsonSerializer.Serialize(new { findings, count = findings.Count }, new JsonSerializerOptions
         {

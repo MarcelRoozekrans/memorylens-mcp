@@ -19,7 +19,7 @@ public class SnapshotTool(SnapshotManager snapshotManager)
         [Description("Seconds to wait before taking snapshot")] int? durationSeconds = null,
         CancellationToken ct = default)
     {
-        var result = await snapshotManager.TakeSnapshotAsync(pid, processName, command, durationSeconds, ct);
+        var result = await snapshotManager.TakeSnapshotAsync(pid, processName, command, durationSeconds, ct).ConfigureAwait(false);
 
         return JsonSerializer.Serialize(result, new JsonSerializerOptions
         {

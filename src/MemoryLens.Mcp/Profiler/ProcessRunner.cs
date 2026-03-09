@@ -21,9 +21,9 @@ public class ProcessRunner : IProcessRunner
         };
 
         process.Start();
-        var output = await process.StandardOutput.ReadToEndAsync(ct);
-        var error = await process.StandardError.ReadToEndAsync(ct);
-        await process.WaitForExitAsync(ct);
+        var output = await process.StandardOutput.ReadToEndAsync(ct).ConfigureAwait(false);
+        var error = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
+        await process.WaitForExitAsync(ct).ConfigureAwait(false);
 
         return new ProcessResult(process.ExitCode, output, error);
     }

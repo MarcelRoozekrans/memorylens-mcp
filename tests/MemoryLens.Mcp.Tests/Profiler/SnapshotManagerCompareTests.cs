@@ -13,7 +13,7 @@ public class SnapshotManagerCompareTests
         var filter = new ProcessFilter();
         var manager = new SnapshotManager(runner, filter);
 
-        var result = await manager.CompareSnapshotsAsync(pid: 1234, delaySeconds: 0);
+        var result = await manager.CompareSnapshotsAsync(pid: 1234, delaySeconds: 0, ct: TestContext.Current.CancellationToken);
 
         Assert.True(result.Success);
         Assert.NotNull(result.SnapshotId);
@@ -28,7 +28,7 @@ public class SnapshotManagerCompareTests
         var filter = new ProcessFilter();
         var manager = new SnapshotManager(runner, filter);
 
-        var result = await manager.CompareSnapshotsAsync(processName: "devenv", delaySeconds: 0);
+        var result = await manager.CompareSnapshotsAsync(processName: "devenv", delaySeconds: 0, ct: TestContext.Current.CancellationToken);
 
         Assert.False(result.Success);
         Assert.Contains("excluded", result.Error!);
@@ -42,7 +42,7 @@ public class SnapshotManagerCompareTests
         var filter = new ProcessFilter();
         var manager = new SnapshotManager(runner, filter);
 
-        var result = await manager.CompareSnapshotsAsync(pid: 1234, delaySeconds: 0);
+        var result = await manager.CompareSnapshotsAsync(pid: 1234, delaySeconds: 0, ct: TestContext.Current.CancellationToken);
 
         Assert.False(result.Success);
         Assert.Contains("Before snapshot failed", result.Error!);
@@ -57,7 +57,7 @@ public class SnapshotManagerCompareTests
         var filter = new ProcessFilter();
         var manager = new SnapshotManager(runner, filter);
 
-        var result = await manager.CompareSnapshotsAsync(pid: 1234, delaySeconds: 0);
+        var result = await manager.CompareSnapshotsAsync(pid: 1234, delaySeconds: 0, ct: TestContext.Current.CancellationToken);
 
         Assert.False(result.Success);
         Assert.Contains("After snapshot failed", result.Error!);
@@ -72,7 +72,7 @@ public class SnapshotManagerCompareTests
         var filter = new ProcessFilter();
         var manager = new SnapshotManager(runner, filter);
 
-        var result = await manager.CompareSnapshotsAsync(command: "dotnet run --project MyApp", delaySeconds: 0);
+        var result = await manager.CompareSnapshotsAsync(command: "dotnet run --project MyApp", delaySeconds: 0, ct: TestContext.Current.CancellationToken);
 
         Assert.True(result.Success);
         Assert.Equal(2, result.SnapshotCount);
