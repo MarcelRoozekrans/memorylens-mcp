@@ -1741,7 +1741,7 @@ MIT license with `Marcel Roozekrans` and year `2026`.
 Include:
 - What MemoryLens does (one paragraph)
 - Installation (`claude plugin add memorylens from gh:MarcelRoozekrans/memorylens-mcp`)
-- Prerequisites (.NET 9 SDK)
+- Prerequisites (.NET 10 SDK)
 - Available MCP tools (table from design doc)
 - Built-in rules (table from design doc)
 - Configuration (`.memorylens.json` example)
