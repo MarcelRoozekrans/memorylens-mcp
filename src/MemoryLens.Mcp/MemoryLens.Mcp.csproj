@@ -6,7 +6,23 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+    <!-- NuGet dotnet tool packaging -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>memorylens-mcp</ToolCommandName>
+    <PackageId>MemoryLens.Mcp</PackageId>
+    <Authors>Marcel Roozekrans</Authors>
+    <Description>MCP server for .NET memory profiling — wraps JetBrains dotnet-dotmemory with heuristic-based analysis rules</Description>
+    <PackageProjectUrl>https://github.com/MarcelRoozekrans/memorylens-mcp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/MarcelRoozekrans/memorylens-mcp</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>mcp;memory;profiling;dotmemory;diagnostics;dotnet-tool</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
