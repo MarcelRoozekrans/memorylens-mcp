@@ -6,7 +6,7 @@
 
 **Architecture:** Thin .NET MCP server using `ModelContextProtocol` SDK. Shells out to `dotnet-dotmemory` CLI for profiling. Parses structured output and runs a rule engine that produces code diffs. Packaged as a standalone Claude Code marketplace plugin.
 
-**Tech Stack:** .NET 9, ModelContextProtocol NuGet, dotnet-dotmemory global tool, GitVersion, conventional commits
+**Tech Stack:** .NET 10 (LTS, C# 14), ModelContextProtocol 1.1.0, dotnet-dotmemory global tool, GitVersion 6.6.0, xUnit v3 3.2.2, NSubstitute 5.3.0, conventional commits
 
 ---
 
@@ -24,7 +24,7 @@
 ```bash
 dotnet new sln -n memorylens-mcp
 mkdir -p src/MemoryLens.Mcp
-dotnet new console -n MemoryLens.Mcp -o src/MemoryLens.Mcp --framework net9.0
+dotnet new console -n MemoryLens.Mcp -o src/MemoryLens.Mcp --framework net10.0
 dotnet sln add src/MemoryLens.Mcp/MemoryLens.Mcp.csproj
 ```
 
@@ -32,7 +32,7 @@ dotnet sln add src/MemoryLens.Mcp/MemoryLens.Mcp.csproj
 
 ```bash
 cd src/MemoryLens.Mcp
-dotnet add package ModelContextProtocol --prerelease
+dotnet add package ModelContextProtocol --version 1.1.0
 dotnet add package Microsoft.Extensions.Hosting
 ```
 
@@ -134,11 +134,11 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
-      - uses: gittools/actions/gitversion/setup@v3.2
+          dotnet-version: '10.0.x'
+      - uses: gittools/actions/gitversion/setup@v4.2.0
         with:
-          versionSpec: '6.x'
-      - uses: gittools/actions/gitversion/execute@v3.2
+          versionSpec: '6.6.x'
+      - uses: gittools/actions/gitversion/execute@v4.2.0
         id: gitversion
       - run: dotnet build -c Release /p:Version=${{ steps.gitversion.outputs.semVer }}
       - run: dotnet test -c Release --no-build
@@ -165,11 +165,11 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
-      - uses: gittools/actions/gitversion/setup@v3.2
+          dotnet-version: '10.0.x'
+      - uses: gittools/actions/gitversion/setup@v4.2.0
         with:
-          versionSpec: '6.x'
-      - uses: gittools/actions/gitversion/execute@v3.2
+          versionSpec: '6.6.x'
+      - uses: gittools/actions/gitversion/execute@v4.2.0
         id: gitversion
       - run: dotnet build -c Release /p:Version=${{ steps.gitversion.outputs.semVer }}
       - name: Generate changelog
@@ -214,10 +214,15 @@ git commit -m "ci: add GitVersion, conventional commits, CI/CD workflows"
 
 ```bash
 mkdir -p tests/MemoryLens.Mcp.Tests
-dotnet new xunit -n MemoryLens.Mcp.Tests -o tests/MemoryLens.Mcp.Tests --framework net9.0
+dotnet new console -n MemoryLens.Mcp.Tests -o tests/MemoryLens.Mcp.Tests --framework net10.0
+cd tests/MemoryLens.Mcp.Tests
+dotnet add package xunit.v3 --version 3.2.2
+dotnet add package xunit.runner.visualstudio --version 3.1.5
+dotnet add package Microsoft.NET.Test.Sdk
+cd ../..
 dotnet sln add tests/MemoryLens.Mcp.Tests/MemoryLens.Mcp.Tests.csproj
 dotnet add tests/MemoryLens.Mcp.Tests reference src/MemoryLens.Mcp
-dotnet add tests/MemoryLens.Mcp.Tests package NSubstitute
+dotnet add tests/MemoryLens.Mcp.Tests package NSubstitute --version 5.3.0
 ```
 
 **Step 2: Write failing test for `DotMemoryToolManager`**

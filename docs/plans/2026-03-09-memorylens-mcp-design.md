@@ -207,7 +207,10 @@ A separate superpowers-extensions plugin will be created later for deeper superp
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Runtime | .NET (C#) | Natural fit for dotMemory, consistent with roslyn-codegraph |
+| Runtime | .NET 10 LTS (C# 14) | Latest stable LTS, natural fit for dotMemory |
+| MCP SDK | ModelContextProtocol 1.1.0 | Latest stable, official C# SDK |
+| Testing | xUnit v3 3.2.2, NSubstitute 5.3.0 | Latest stable versions |
+| Versioning | GitVersion 6.6.0 | Conventional commits, auto SemVer |
 | dotMemory invocation | `dotnet-dotmemory` global tool | Newer CLI approach, managed lifecycle |
 | Profiler architecture | CLI wrapper (Approach A) | Simple, process-isolated, uses supported interface |
 | Suggestion format | Concrete code diffs | Best for AI to apply directly via Edit tool |
