@@ -1,0 +1,6 @@
+{
+  "memorylens": {
+    "command": "dotnet",
+    "args": ["run", "--project", "src/MemoryLens.Mcp"]
+  }
+}

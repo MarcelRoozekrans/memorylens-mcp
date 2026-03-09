@@ -1,0 +1,15 @@
+{
+  "name": "memorylens",
+  "version": "0.1.0",
+  "description": "On-demand .NET memory profiling with concrete code fix suggestions — powered by JetBrains dotMemory",
+  "author": {
+    "name": "Marcel Roozekrans",
+    "url": "https://github.com/MarcelRoozekrans"
+  },
+  "homepage": "https://github.com/MarcelRoozekrans/memorylens-mcp",
+  "repository": "https://github.com/MarcelRoozekrans/memorylens-mcp",
+  "license": "MIT",
+  "keywords": ["memory", "profiling", "dotmemory", "mcp", "dotnet", "leak-detection"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}
