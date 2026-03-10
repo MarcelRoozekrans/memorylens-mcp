@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.marcelroozekrans/memorylens-mcp",
+  "description": "MCP server for .NET memory profiling — wraps JetBrains dotnet-dotmemory with heuristic-based analysis rules",
+  "title": "MemoryLens",
+  "repository": {
+    "url": "https://github.com/MarcelRoozekrans/memorylens-mcp",
+    "source": "github"
+  },
+  "version": "0.0.0",
+  "packages": [
+    {
+      "registryType": "nuget",
+      "registryBaseUrl": "https://api.nuget.org/v3/index.json",
+      "identifier": "MemoryLens.Mcp",
+      "version": "0.0.0",
+      "runtimeHint": "dnx",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

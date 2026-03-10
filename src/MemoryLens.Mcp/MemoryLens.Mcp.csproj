@@ -18,6 +18,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>mcp;memory;profiling;dotmemory;diagnostics;dotnet-tool</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageType>DotnetTool;McpServer</PackageType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,5 +29,16 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
     <PackageReference Include="ModelContextProtocol" Version="1.1.0" />
   </ItemGroup>
+
+  <Target Name="SetMcpServerVersion" BeforeTargets="GenerateNuspec">
+    <PropertyGroup>
+      <_McpServerJsonIntermediate>$(MSBuildProjectDirectory)\$(IntermediateOutputPath).mcp\server.json</_McpServerJsonIntermediate>
+    </PropertyGroup>
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\.mcp\server.json" DestinationFiles="$(_McpServerJsonIntermediate)" />
+    <Exec Command="powershell -NoProfile -Command &quot;(Get-Content '$(_McpServerJsonIntermediate)' -Raw) -replace '0\.0\.0','$(Version)' | Set-Content '$(_McpServerJsonIntermediate)' -NoNewline&quot;" />
+    <ItemGroup>
+      <_PackageFiles Include="$(_McpServerJsonIntermediate)" PackagePath=".mcp\" />
+    </ItemGroup>
+  </Target>
 
 </Project>
