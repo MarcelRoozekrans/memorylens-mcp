@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include=".mcp\server.json" Pack="true" PackagePath=".mcp\" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,15 +31,24 @@
     <PackageReference Include="ModelContextProtocol" Version="1.1.0" />
   </ItemGroup>
 
-  <Target Name="SetMcpServerVersion" BeforeTargets="GenerateNuspec">
-    <PropertyGroup>
-      <_McpServerJsonIntermediate>$(MSBuildProjectDirectory)\$(IntermediateOutputPath).mcp\server.json</_McpServerJsonIntermediate>
-    </PropertyGroup>
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\.mcp\server.json" DestinationFiles="$(_McpServerJsonIntermediate)" />
-    <Exec Command="powershell -NoProfile -Command &quot;(Get-Content '$(_McpServerJsonIntermediate)' -Raw) -replace '0\.0\.0','$(Version)' | Set-Content '$(_McpServerJsonIntermediate)' -NoNewline&quot;" />
-    <ItemGroup>
-      <_PackageFiles Include="$(_McpServerJsonIntermediate)" PackagePath=".mcp\" />
-    </ItemGroup>
+  <!-- Stamp the package version into .mcp/server.json before packing -->
+  <UsingTask TaskName="StampMcpVersion" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <FilePath ParameterType="System.String" Required="true" />
+      <PackageVersion ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Code Type="Fragment" Language="cs">
+        var content = File.ReadAllText(FilePath);
+        content = System.Text.RegularExpressions.Regex.Replace(
+            content, @"""version""\s*:\s*""[^""]*""", $@"""version"": ""{PackageVersion}""");
+        File.WriteAllText(FilePath, content);
+      </Code>
+    </Task>
+  </UsingTask>
+  <Target Name="StampMcpServerJsonVersion" BeforeTargets="GenerateNuspec">
+    <StampMcpVersion FilePath="$(MSBuildProjectDirectory)/.mcp/server.json" PackageVersion="$(Version)" />
   </Target>
 
 </Project>
