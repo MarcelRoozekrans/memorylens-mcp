@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.0.0...v1.1.0) (2026-03-10)
+
+
+### Features
+
+* add NuGet package icon ([9974885](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/99748853fd3f035ba63b92fffbd2f499e2c437bb))
+* add package icon for NuGet ([757917b](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/757917b109ad8835a4be01447a440a747d1aee13))
+
 ## 1.0.0 (2026-03-09)
 
 
