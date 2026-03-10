@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.2.0...v1.3.0) (2026-03-10)
+
+
+### Features
+
+* README badges and MCP Registry prep ([5ddfddf](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/5ddfddf72d1f5067254181b85a4ac021b175d945))
+
 ## [1.2.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.1.0...v1.2.0) (2026-03-10)
 
 
