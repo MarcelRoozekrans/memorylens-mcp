@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6C3FA0"/>
+      <stop offset="100%" style="stop-color:#3B1F6E"/>
+    </linearGradient>
+    <linearGradient id="lens" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#A78BFA;stop-opacity:0.6"/>
+      <stop offset="50%" style="stop-color:#7C3AED;stop-opacity:0.2"/>
+      <stop offset="100%" style="stop-color:#C4B5FD;stop-opacity:0.4"/>
+    </linearGradient>
+    <linearGradient id="handle" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E0D4FC"/>
+      <stop offset="100%" style="stop-color:#A78BFA"/>
+    </linearGradient>
+    <linearGradient id="chip" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#34D399"/>
+      <stop offset="100%" style="stop-color:#10B981"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded background -->
+  <rect width="512" height="512" rx="96" ry="96" fill="url(#bg)"/>
+
+  <!-- Magnifying glass handle -->
+  <line x1="320" y1="320" x2="410" y2="410" stroke="url(#handle)" stroke-width="36" stroke-linecap="round"/>
+
+  <!-- Magnifying glass ring -->
+  <circle cx="220" cy="220" r="120" fill="none" stroke="#E0D4FC" stroke-width="24"/>
+
+  <!-- Lens glass -->
+  <circle cx="220" cy="220" r="108" fill="url(#lens)"/>
+
+  <!-- Memory chip body inside lens -->
+  <rect x="178" y="170" width="84" height="100" rx="6" ry="6" fill="url(#chip)"/>
+
+  <!-- Chip pins left -->
+  <rect x="164" y="185" width="18" height="6" rx="2" fill="#34D399"/>
+  <rect x="164" y="200" width="18" height="6" rx="2" fill="#34D399"/>
+  <rect x="164" y="215" width="18" height="6" rx="2" fill="#34D399"/>
+  <rect x="164" y="230" width="18" height="6" rx="2" fill="#34D399"/>
+  <rect x="164" y="245" width="18" height="6" rx="2" fill="#34D399"/>
+
+  <!-- Chip pins right -->
+  <rect x="258" y="185" width="18" height="6" rx="2" fill="#34D399"/>
+  <rect x="258" y="200" width="18" height="6" rx="2" fill="#34D399"/>
+  <rect x="258" y="215" width="18" height="6" rx="2" fill="#34D399"/>
+  <rect x="258" y="230" width="18" height="6" rx="2" fill="#34D399"/>
+  <rect x="258" y="245" width="18" height="6" rx="2" fill="#34D399"/>
+
+  <!-- Chip detail lines -->
+  <line x1="195" y1="190" x2="195" y2="252" stroke="#059669" stroke-width="2" stroke-opacity="0.5"/>
+  <line x1="210" y1="190" x2="210" y2="252" stroke="#059669" stroke-width="2" stroke-opacity="0.5"/>
+  <line x1="225" y1="190" x2="225" y2="252" stroke="#059669" stroke-width="2" stroke-opacity="0.5"/>
+  <line x1="240" y1="190" x2="240" y2="252" stroke="#059669" stroke-width="2" stroke-opacity="0.5"/>
+
+  <!-- Chip notch -->
+  <circle cx="220" cy="175" r="5" fill="#059669" fill-opacity="0.4"/>
+
+  <!-- Lens glare -->
+  <ellipse cx="175" cy="175" rx="30" ry="15" transform="rotate(-45 175 175)" fill="white" fill-opacity="0.15"/>
+</svg>
