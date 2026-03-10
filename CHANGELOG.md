@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.1.0...v1.2.0) (2026-03-10)
+
+
+### Features
+
+* add NuGet MCP server discovery metadata ([4cb99a0](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/4cb99a0b41d6ac45d99e8751f5bff1d98093d3d1))
+* add NuGet MCP server discovery metadata ([99e75ca](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/99e75ca6c8e7f03228a72048da80703fa20c0955))
+
 ## [1.1.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.0.0...v1.1.0) (2026-03-10)
 
 
