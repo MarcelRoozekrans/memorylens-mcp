@@ -1,11 +1,52 @@
-# MemoryLens MCP
+<p align="center">
+  <img src="icon.svg" width="128" height="128" alt="MemoryLens MCP">
+</p>
 
-MemoryLens is a Model Context Protocol (MCP) server that provides on-demand .NET memory profiling with concrete, AI-actionable code fix suggestions. It integrates JetBrains dotMemory as a profiling backend and exposes memory analysis through MCP tools, enabling Claude to capture snapshots, detect memory leaks, and suggest targeted code changes based on a built-in rule engine.
+<h1 align="center">MemoryLens MCP</h1>
 
-## Installation
+<p align="center">
+  <a href="https://www.nuget.org/packages/MemoryLens.Mcp"><img src="https://img.shields.io/nuget/v/MemoryLens.Mcp?style=flat-square&logo=nuget&color=blue" alt="NuGet"></a>
+  <a href="https://www.nuget.org/packages/MemoryLens.Mcp"><img src="https://img.shields.io/nuget/dt/MemoryLens.Mcp?style=flat-square&color=green" alt="NuGet Downloads"></a>
+  <a href="https://github.com/MarcelRoozekrans/memorylens-mcp/actions"><img src="https://img.shields.io/github/actions/workflow/status/MarcelRoozekrans/memorylens-mcp/ci.yml?branch=main&style=flat-square&logo=github" alt="Build Status"></a>
+  <a href="https://github.com/MarcelRoozekrans/memorylens-mcp/blob/main/LICENSE"><img src="https://img.shields.io/github/license/MarcelRoozekrans/memorylens-mcp?style=flat-square" alt="License"></a>
+</p>
+
+<p align="center">
+  On-demand .NET memory profiling with concrete, AI-actionable code fix suggestions — wraps JetBrains dotMemory with a heuristic-based rule engine.
+</p>
+
+<!-- mcp-name: io.github.marcelroozekrans/memorylens-mcp -->
+
+---
+
+## Quick Start
+
+### VS Code / Visual Studio (via dnx)
+
+Add to your MCP settings (`.vscode/mcp.json` or VS settings):
+
+```json
+{
+  "servers": {
+    "memorylens": {
+      "type": "stdio",
+      "command": "dnx",
+      "args": ["MemoryLens.Mcp", "--yes"]
+    }
+  }
+}
+```
+
+### Claude Code Plugin
 
 ```bash
-claude plugin add memorylens from gh:MarcelRoozekrans/memorylens-mcp
+claude install gh:MarcelRoozekrans/memorylens-mcp
+```
+
+### .NET Global Tool
+
+```bash
+dotnet tool install -g MemoryLens.Mcp
 ```
 
 ## Prerequisites
