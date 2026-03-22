@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.3.0...v1.3.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* correct dotnet-version format (10.0.x not net10.0) ([aaba7da](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/aaba7da083e151fcf98b80d13e3d0d61101aae66))
+
 ## [1.3.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.2.0...v1.3.0) (2026-03-10)
 
 
