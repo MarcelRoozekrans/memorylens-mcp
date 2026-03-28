@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.2](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.3.1...v1.3.2) (2026-03-28)
+
+
+### Bug Fixes
+
+* correct MCP registry name casing and shorten description ([5e280d2](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/5e280d2aa37eb81ab39a9f692f426060cce41666))
+* correct MCP registry name casing and shorten description ([fc38a35](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/fc38a3556135f344c0577c044b26d429725d0210))
+
 ## [1.3.1](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.3.0...v1.3.1) (2026-03-22)
 
 
