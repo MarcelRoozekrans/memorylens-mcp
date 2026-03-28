@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.3](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.3.2...v1.3.3) (2026-03-28)
+
+
+### Bug Fixes
+
+* add mcp-name to README for MCP registry ownership verification ([0ed495e](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/0ed495e0b2c35ec46816a329af412ae7bd0dd1d8))
+* add mcp-name to README for MCP registry ownership verification ([f080957](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/f080957e6f9511024e97364b09af6f4b6664ea5c))
+
 ## [1.3.2](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.3.1...v1.3.2) (2026-03-28)
 
 
