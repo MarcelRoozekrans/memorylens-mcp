@@ -19,7 +19,7 @@
   <img width="380" height="200" src="https://glama.ai/mcp/servers/MarcelRoozekrans/memorylens-mcp/badge" alt="memorylens-mcp MCP server" />
 </a>
 
-<!-- mcp-name: io.github.marcelroozekrans/memorylens-mcp -->
+<!-- mcp-name: io.github.MarcelRoozekrans/memorylens-mcp -->
 
 ---
 
