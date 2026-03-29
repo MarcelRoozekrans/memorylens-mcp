@@ -23,6 +23,10 @@
 
 ---
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/marcelroozekrans-memorylens-mcp).
+
 ## Quick Start
 
 ### VS Code / Visual Studio (via dnx)
