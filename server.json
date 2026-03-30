@@ -6,13 +6,13 @@
     "url": "https://github.com/MarcelRoozekrans/memorylens-mcp",
     "source": "github"
   },
-  "version": "0.0.0",
+  "version": "1.3.4",
   "packages": [
     {
       "registryType": "nuget",
       "registryBaseUrl": "https://api.nuget.org/v3/index.json",
       "identifier": "MemoryLens.Mcp",
-      "version": "0.0.0",
+      "version": "1.3.4",
       "runtimeHint": "dnx",
       "transport": {
         "type": "stdio"
