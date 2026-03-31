@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.5](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.3.4...v1.3.5) (2026-03-31)
+
+
+### Bug Fixes
+
+* set server.json version to match release-please manifest ([d62fae7](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/d62fae744b4b69c498dd788f4c0ce4a3d2c873ec))
+* set server.json version to match release-please manifest ([644c9af](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/644c9af0b68f83b50408a85c4c89eb7c97d0966e))
+
 ## [1.3.4](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.3.3...v1.3.4) (2026-03-29)
 
 
