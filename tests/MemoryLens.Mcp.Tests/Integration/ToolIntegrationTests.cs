@@ -122,7 +122,8 @@ public class ToolIntegrationTests
     {
         var runner = new FakeProcessRunner(exitCode: 0, output: "Snapshot taken");
         var filter = new ProcessFilter();
-        var manager = new SnapshotManager(runner, filter);
+        var toolManager = new FakeDotMemoryToolManager(runner);
+        var manager = new SnapshotManager(runner, filter, toolManager);
         var tool = new SnapshotTool(manager);
 
         var json = await tool.snapshot(pid: 1234, ct: TestContext.Current.CancellationToken);
@@ -138,7 +139,8 @@ public class ToolIntegrationTests
     {
         var runner = new FakeProcessRunner(exitCode: 0, output: "");
         var filter = new ProcessFilter();
-        var manager = new SnapshotManager(runner, filter);
+        var toolManager = new FakeDotMemoryToolManager(runner);
+        var manager = new SnapshotManager(runner, filter, toolManager);
         var tool = new SnapshotTool(manager);
 
         var json = await tool.snapshot(processName: "devenv", ct: TestContext.Current.CancellationToken);
@@ -154,7 +156,8 @@ public class ToolIntegrationTests
         var runner = new FakeProcessRunner(exitCode: 0, output: "Before snapshot taken");
         runner.SetNextResult(exitCode: 0, output: "After snapshot taken");
         var filter = new ProcessFilter();
-        var manager = new SnapshotManager(runner, filter);
+        var toolManager = new FakeDotMemoryToolManager(runner);
+        var manager = new SnapshotManager(runner, filter, toolManager);
         var tool = new CompareSnapshotsTool(manager);
 
         var json = await tool.compare_snapshots(pid: 1234, delaySeconds: 0, ct: TestContext.Current.CancellationToken);

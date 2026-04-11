@@ -10,7 +10,8 @@ public class SnapshotManagerTests
     {
         var runner = new FakeProcessRunner(exitCode: 0, output: "Snapshot saved");
         var filter = new ProcessFilter();
-        var manager = new SnapshotManager(runner, filter);
+        var toolManager = new FakeDotMemoryToolManager(runner);
+        var manager = new SnapshotManager(runner, filter, toolManager);
 
         var result = await manager.TakeSnapshotAsync(pid: 1234, ct: TestContext.Current.CancellationToken);
 
@@ -24,7 +25,8 @@ public class SnapshotManagerTests
     {
         var runner = new FakeProcessRunner(exitCode: 0, output: "");
         var filter = new ProcessFilter();
-        var manager = new SnapshotManager(runner, filter);
+        var toolManager = new FakeDotMemoryToolManager(runner);
+        var manager = new SnapshotManager(runner, filter, toolManager);
 
         var result = await manager.TakeSnapshotAsync(processName: "devenv", ct: TestContext.Current.CancellationToken);
 
@@ -37,7 +39,8 @@ public class SnapshotManagerTests
     {
         var runner = new FakeProcessRunner(exitCode: 0, output: "Snapshot saved");
         var filter = new ProcessFilter();
-        var manager = new SnapshotManager(runner, filter);
+        var toolManager = new FakeDotMemoryToolManager(runner);
+        var manager = new SnapshotManager(runner, filter, toolManager);
 
         var result = await manager.TakeSnapshotAsync(processName: "MyApp", ct: TestContext.Current.CancellationToken);
 
@@ -50,7 +53,8 @@ public class SnapshotManagerTests
     {
         var runner = new FakeProcessRunner(exitCode: 0, output: "Snapshot saved");
         var filter = new ProcessFilter();
-        var manager = new SnapshotManager(runner, filter);
+        var toolManager = new FakeDotMemoryToolManager(runner);
+        var manager = new SnapshotManager(runner, filter, toolManager);
 
         var result = await manager.TakeSnapshotAsync(command: "dotnet run --project MyApp", ct: TestContext.Current.CancellationToken);
 
@@ -63,11 +67,12 @@ public class SnapshotManagerTests
     {
         var runner = new FakeProcessRunner(exitCode: 1, output: "");
         var filter = new ProcessFilter();
-        var manager = new SnapshotManager(runner, filter);
+        var toolManager = new FakeDotMemoryToolManager(runner);
+        var manager = new SnapshotManager(runner, filter, toolManager);
 
         var result = await manager.TakeSnapshotAsync(pid: 1234, ct: TestContext.Current.CancellationToken);
 
         Assert.False(result.Success);
-        Assert.Contains("dotnet-dotmemory failed", result.Error!);
+        Assert.Contains("dotMemory CLI failed", result.Error!);
     }
 }

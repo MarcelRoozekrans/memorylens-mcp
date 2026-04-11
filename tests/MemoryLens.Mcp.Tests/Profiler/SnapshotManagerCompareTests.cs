@@ -11,7 +11,8 @@ public class SnapshotManagerCompareTests
         var runner = new FakeProcessRunner(exitCode: 0, output: "Before snapshot saved");
         runner.SetNextResult(exitCode: 0, output: "After snapshot saved");
         var filter = new ProcessFilter();
-        var manager = new SnapshotManager(runner, filter);
+        var toolManager = new FakeDotMemoryToolManager(runner);
+        var manager = new SnapshotManager(runner, filter, toolManager);
 
         var result = await manager.CompareSnapshotsAsync(pid: 1234, delaySeconds: 0, ct: TestContext.Current.CancellationToken);
 
@@ -26,7 +27,8 @@ public class SnapshotManagerCompareTests
     {
         var runner = new FakeProcessRunner(exitCode: 0, output: "");
         var filter = new ProcessFilter();
-        var manager = new SnapshotManager(runner, filter);
+        var toolManager = new FakeDotMemoryToolManager(runner);
+        var manager = new SnapshotManager(runner, filter, toolManager);
 
         var result = await manager.CompareSnapshotsAsync(processName: "devenv", delaySeconds: 0, ct: TestContext.Current.CancellationToken);
 
@@ -40,7 +42,8 @@ public class SnapshotManagerCompareTests
     {
         var runner = new FakeProcessRunner(exitCode: 1, output: "");
         var filter = new ProcessFilter();
-        var manager = new SnapshotManager(runner, filter);
+        var toolManager = new FakeDotMemoryToolManager(runner);
+        var manager = new SnapshotManager(runner, filter, toolManager);
 
         var result = await manager.CompareSnapshotsAsync(pid: 1234, delaySeconds: 0, ct: TestContext.Current.CancellationToken);
 
@@ -55,7 +58,8 @@ public class SnapshotManagerCompareTests
         var runner = new FakeProcessRunner(exitCode: 0, output: "Before saved");
         runner.SetNextResult(exitCode: 1, output: "");
         var filter = new ProcessFilter();
-        var manager = new SnapshotManager(runner, filter);
+        var toolManager = new FakeDotMemoryToolManager(runner);
+        var manager = new SnapshotManager(runner, filter, toolManager);
 
         var result = await manager.CompareSnapshotsAsync(pid: 1234, delaySeconds: 0, ct: TestContext.Current.CancellationToken);
 
@@ -70,7 +74,8 @@ public class SnapshotManagerCompareTests
         var runner = new FakeProcessRunner(exitCode: 0, output: "Before snapshot saved");
         runner.SetNextResult(exitCode: 0, output: "After snapshot saved");
         var filter = new ProcessFilter();
-        var manager = new SnapshotManager(runner, filter);
+        var toolManager = new FakeDotMemoryToolManager(runner);
+        var manager = new SnapshotManager(runner, filter, toolManager);
 
         var result = await manager.CompareSnapshotsAsync(command: "dotnet run --project MyApp", delaySeconds: 0, ct: TestContext.Current.CancellationToken);
 
