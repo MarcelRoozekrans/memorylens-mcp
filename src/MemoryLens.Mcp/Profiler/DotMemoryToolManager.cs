@@ -28,19 +28,28 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
         ? ["dotMemory.exe", "dotnet-dotmemory"]
         : ["dotMemory.sh", "dotMemory", "dotnet-dotmemory"];
 
+    private DotMemoryCommand? _cachedCommand;
+
     public async Task<ToolStatus> EnsureInstalledAsync(CancellationToken ct = default)
     {
+        InvalidateCache();
         var command = await ResolveCommandAsync(ct).ConfigureAwait(false);
         if (command is not null)
         {
-            // Try to update global tool if it's the one being used
-            var globalToolResult = await TryRunAsync("dotnet", "tool list -g", ct).ConfigureAwait(false);
-            if (globalToolResult is not null && globalToolResult.ExitCode == 0 &&
-                ContainsTool(globalToolResult.Output))
+            // Try to update global tool only if the resolved command is actually the global-tool shim
+            var isGlobalTool = command.FileName.Contains("dotnet-dotmemory") ||
+                              command.FileName.Contains("dotMemory") == false;
+
+            if (isGlobalTool)
             {
-                var version = ParseVersion(globalToolResult.Output);
-                await processRunner.RunAsync("dotnet", "tool update -g dotnet-dotmemory", ct).ConfigureAwait(false);
-                return new ToolStatus(true, version, $"dotnet-dotmemory {version} is installed.");
+                var globalToolResult = await TryRunAsync("dotnet", "tool list -g", ct).ConfigureAwait(false);
+                if (globalToolResult is not null && globalToolResult.ExitCode == 0 &&
+                    ContainsTool(globalToolResult.Output))
+                {
+                    var version = ParseVersion(globalToolResult.Output);
+                    await processRunner.RunAsync("dotnet", "tool update -g dotnet-dotmemory", ct).ConfigureAwait(false);
+                    return new ToolStatus(true, version, $"dotnet-dotmemory {version} is installed.");
+                }
             }
 
             return new ToolStatus(
@@ -83,19 +92,38 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
 
     public virtual async Task<DotMemoryCommand?> ResolveCommandAsync(CancellationToken ct = default)
     {
+        if (_cachedCommand is not null)
+            return _cachedCommand;
+
         var configured = ResolveConfiguredPath();
         if (configured is not null)
+        {
+            _cachedCommand = configured;
             return configured;
+        }
 
         var fromPath = await ResolveFromPathAsync(ct).ConfigureAwait(false);
         if (fromPath is not null)
+        {
+            _cachedCommand = fromPath;
             return fromPath;
+        }
 
         var localTool = await ResolveLocalToolAsync(ct).ConfigureAwait(false);
         if (localTool is not null)
+        {
+            _cachedCommand = localTool;
             return localTool;
+        }
 
-        return await ResolveGlobalToolAsync(ct).ConfigureAwait(false);
+        var globalTool = await ResolveGlobalToolAsync(ct).ConfigureAwait(false);
+        _cachedCommand = globalTool;
+        return globalTool;
+    }
+
+    public void InvalidateCache()
+    {
+        _cachedCommand = null;
     }
 
     private DotMemoryCommand? ResolveConfiguredPath()
