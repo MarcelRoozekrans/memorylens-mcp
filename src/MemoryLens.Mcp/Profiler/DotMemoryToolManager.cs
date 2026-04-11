@@ -33,6 +33,16 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
         var command = await ResolveCommandAsync(ct).ConfigureAwait(false);
         if (command is not null)
         {
+            // Try to update global tool if it's the one being used
+            var globalToolResult = await TryRunAsync("dotnet", "tool list -g", ct).ConfigureAwait(false);
+            if (globalToolResult is not null && globalToolResult.ExitCode == 0 &&
+                ContainsTool(globalToolResult.Output))
+            {
+                var version = ParseVersion(globalToolResult.Output);
+                await processRunner.RunAsync("dotnet", "tool update -g dotnet-dotmemory", ct).ConfigureAwait(false);
+                return new ToolStatus(true, version, $"dotnet-dotmemory {version} is installed.");
+            }
+
             return new ToolStatus(
                 true,
                 string.IsNullOrWhiteSpace(command.Version) ? null : command.Version,
@@ -71,7 +81,7 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
             "Add the .NET tools directory to PATH or set DOTMEMORY_PATH explicitly.");
     }
 
-    public async Task<DotMemoryCommand?> ResolveCommandAsync(CancellationToken ct = default)
+    public virtual async Task<DotMemoryCommand?> ResolveCommandAsync(CancellationToken ct = default)
     {
         var configured = ResolveConfiguredPath();
         if (configured is not null)
@@ -196,6 +206,10 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
         if (result is null)
             return null;
 
+        // Require successful exit code to validate this is actually dotMemory
+        if (result.ExitCode != 0)
+            return null;
+
         var text = string.IsNullOrWhiteSpace(result.Output)
             ? result.Error
             : result.Output;
@@ -213,6 +227,10 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
         try
         {
             return await processRunner.RunAsync(fileName, arguments, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {

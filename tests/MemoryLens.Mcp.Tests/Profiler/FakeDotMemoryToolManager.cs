@@ -12,7 +12,7 @@ public class FakeDotMemoryToolManager : DotMemoryToolManager
         _command = command ?? new DotMemoryCommand("dotnet-dotmemory", "", "fake command", "1.0.0");
     }
 
-    public new Task<DotMemoryCommand?> ResolveCommandAsync(CancellationToken ct = default)
+    public override Task<DotMemoryCommand?> ResolveCommandAsync(CancellationToken ct = default)
     {
         return Task.FromResult<DotMemoryCommand?>(_command);
     }
