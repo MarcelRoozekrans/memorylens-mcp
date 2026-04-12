@@ -61,25 +61,49 @@ public class DotMemoryToolManagerTests
         var fakeRunner = new FakeProcessRunner(exitCode: 0, output: "");
         var manager = new DotMemoryToolManager(fakeRunner);
 
+        var tempDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var firstConfiguredPath = Path.Combine(tempDirectory, "first-dotMemory.sh");
+        var secondConfiguredPath = Path.Combine(tempDirectory, "second-dotMemory.sh");
+
+        Directory.CreateDirectory(tempDirectory);
+        File.WriteAllText(firstConfiguredPath, string.Empty);
+        File.WriteAllText(secondConfiguredPath, string.Empty);
+
         try
         {
-            Environment.SetEnvironmentVariable("DOTMEMORY_PATH", "/custom/path/first-dotMemory.sh");
+            Environment.SetEnvironmentVariable("DOTMEMORY_PATH", firstConfiguredPath);
 
             var firstCommand = await manager.ResolveCommandAsync(TestContext.Current.CancellationToken);
             Assert.NotNull(firstCommand);
-            Assert.Contains("first-dotMemory.sh", firstCommand.FileName);
+            Assert.Equal(firstConfiguredPath, firstCommand.FileName);
+            Assert.Equal(DotMemoryCommandKind.ExplicitPath, firstCommand.Kind);
 
-            Environment.SetEnvironmentVariable("DOTMEMORY_PATH", "/custom/path/second-dotMemory.sh");
+            Environment.SetEnvironmentVariable("DOTMEMORY_PATH", secondConfiguredPath);
             manager.InvalidateCache();
 
             var secondCommand = await manager.ResolveCommandAsync(TestContext.Current.CancellationToken);
             Assert.NotNull(secondCommand);
-            Assert.Contains("second-dotMemory.sh", secondCommand.FileName);
+            Assert.Equal(secondConfiguredPath, secondCommand.FileName);
+            Assert.Equal(DotMemoryCommandKind.ExplicitPath, secondCommand.Kind);
             Assert.NotEqual(firstCommand.FileName, secondCommand.FileName);
         }
         finally
         {
             Environment.SetEnvironmentVariable("DOTMEMORY_PATH", null);
+            if (File.Exists(firstConfiguredPath))
+            {
+                File.Delete(firstConfiguredPath);
+            }
+
+            if (File.Exists(secondConfiguredPath))
+            {
+                File.Delete(secondConfiguredPath);
+            }
+
+            if (Directory.Exists(tempDirectory))
+            {
+                Directory.Delete(tempDirectory);
+            }
         }
     }
 

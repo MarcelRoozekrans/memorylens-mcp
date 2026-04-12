@@ -71,13 +71,19 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
 
         if (installResult.ExitCode != 0)
         {
+            var errorMessage = "dotMemory CLI was not found. " +
+                "Set DOTMEMORY_PATH to dotMemory.exe/dotMemory.sh, " +
+                "put dotMemory in PATH, or install dotnet-dotmemory.";
+
+            if (!string.IsNullOrWhiteSpace(installResult.Error))
+            {
+                errorMessage += $" Details: {installResult.Error}";
+            }
+
             return new ToolStatus(
                 false,
                 null,
-                "dotMemory CLI was not found. " +
-                "Set DOTMEMORY_PATH to dotMemory.exe/dotMemory.sh, " +
-                "put dotMemory in PATH, or install dotnet-dotmemory. " +
-                installResult.Error);
+                errorMessage);
         }
 
         command = await ResolveCommandAsync(ct).ConfigureAwait(false);
@@ -144,19 +150,16 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
             if (LooksLikePath(candidate) && !File.Exists(candidate))
                 continue;
 
-            // For non-path candidates (commands without separators), validate with --version
-            if (!LooksLikePath(candidate))
-            {
-                var version = TryProbeSync(candidate);
-                if (version is null)
-                    continue;
-            }
+            // Validate the configured path with --version to ensure it's actually dotMemory CLI
+            var version = TryProbeSync(candidate);
+            if (version is null)
+                continue;
 
             return new DotMemoryCommand(
                 candidate,
                 "",
                 $"{variableName} ({candidate})",
-                null,
+                version,
                 DotMemoryCommandKind.ExplicitPath);
         }
 

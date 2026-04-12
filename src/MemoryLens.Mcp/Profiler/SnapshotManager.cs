@@ -48,7 +48,7 @@ public class SnapshotManager(
                 false,
                 null,
                 null,
-                "dotMemory CLI not found. Run ensure_dotmemory first or set DOTMEMORY_PATH.");
+                "dotMemory CLI not found. Run ensure_dotmemory, set DOTMEMORY_PATH or MEMORYLENS_DOTMEMORY_PATH, or ensure dotMemory is available on PATH.");
         }
 
         var result = await processRunner
@@ -88,7 +88,7 @@ public class SnapshotManager(
                 null,
                 null,
                 0,
-                "dotMemory CLI not found. Run ensure_dotmemory first or set DOTMEMORY_PATH.");
+                "dotMemory CLI not found. Run ensure_dotmemory, set DOTMEMORY_PATH or MEMORYLENS_DOTMEMORY_PATH, or make dotMemory available on PATH.");
         }
 
         // Take before snapshot
