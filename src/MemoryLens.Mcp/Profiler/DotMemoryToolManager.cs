@@ -150,10 +150,9 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
             if (LooksLikePath(candidate) && !File.Exists(candidate))
                 continue;
 
-            // Validate the configured path with --version to ensure it's actually dotMemory CLI
+            // Try to validate with --version, but accept the path if it exists
+            // (user explicitly configured it, so trust it even if --version fails)
             var version = TryProbeSync(candidate);
-            if (version is null)
-                continue;
 
             return new DotMemoryCommand(
                 candidate,
