@@ -60,6 +60,54 @@ dotnet tool install -g MemoryLens.Mcp
 ## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) or later
+- JetBrains dotMemory CLI (see below for installation options)
+
+## dotMemory CLI Installation
+
+MemoryLens MCP supports multiple ways to install and use JetBrains dotMemory CLI:
+
+### Option 1: Official JetBrains dotMemory CLI (Recommended)
+
+Use the official dotMemory CLI from JetBrains Toolbox or direct download:
+
+**JetBrains Toolbox (Linux/macOS):**
+```bash
+# Set DOTMEMORY_PATH to point to your JetBrains Toolbox installation
+export DOTMEMORY_PATH="$HOME/.local/share/JetBrains/Toolbox/apps/rider/tools/profiler/dotMemory.sh"
+```
+
+**JetBrains Toolbox (Windows):**
+```cmd
+set DOTMEMORY_PATH=%LOCALAPPDATA%\JetBrains\Toolbox\apps\rider\tools\profiler\dotMemory.exe
+```
+
+**Direct Installation:**
+Download dotMemory from [jetbrains.com](https://www.jetbrains.com/dotmemory/download/) and set DOTMEMORY_PATH to the CLI executable:
+- Linux/macOS: `<install_dir>/bin/dotMemory.sh`
+- Windows: `<install_dir>\bin\dotMemory.exe`
+
+### Option 2: PATH Discovery
+
+If dotMemory CLI is in your system PATH, MemoryLens MCP will automatically discover it by searching for:
+- Linux/macOS: `dotMemory.sh`, `dotMemory`
+- Windows: `dotMemory.exe`
+
+### Option 3: Local Tool Manifest
+
+Use dotMemory as a local .NET tool in your project:
+```bash
+dotnet new tool-manifest
+dotnet tool install dotnet-dotmemory --local
+```
+
+### Option 4: Global Tool (Legacy)
+
+Install as a global .NET tool (legacy fallback):
+```bash
+dotnet tool install -g dotnet-dotmemory
+```
+
+**Note:** The `dotnet-dotmemory` global tool is not distributed by JetBrains and may not be available in all NuGet feeds. Official JetBrains dotMemory CLI (Option 1) is recommended.
 
 ## Available MCP Tools
 

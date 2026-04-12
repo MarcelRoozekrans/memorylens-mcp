@@ -2,14 +2,23 @@
 using System.Threading;
 using MemoryLens.Mcp.Profiler;
 
-// Set DOTMEMORY_PATH
-Environment.SetEnvironmentVariable("DOTMEMORY_PATH", "/home/gospodin/.local/share/JetBrains/Toolbox/apps/rider/tools/profiler/dotMemory.sh");
+// Check if DOTMEMORY_PATH is set
+var dotMemoryPath = Environment.GetEnvironmentVariable("DOTMEMORY_PATH");
+if (string.IsNullOrWhiteSpace(dotMemoryPath))
+{
+    Console.WriteLine("Error: DOTMEMORY_PATH environment variable is not set.");
+    Console.WriteLine("\nUsage:");
+    Console.WriteLine("  Linux/macOS: export DOTMEMORY_PATH=/path/to/dotMemory.sh");
+    Console.WriteLine("  Windows:     set DOTMEMORY_PATH=C:\\path\\to\\dotMemory.exe");
+    Console.WriteLine("\nThen run this sample again.");
+    Environment.Exit(1);
+}
 
 // Create process runner
 var processRunner = new ProcessRunner();
 var toolManager = new DotMemoryToolManager(processRunner);
 
-Console.WriteLine("Testing EnsureInstalledAsync with DOTMEMORY_PATH...");
+Console.WriteLine($"Testing EnsureInstalledAsync with DOTMEMORY_PATH={dotMemoryPath}...");
 var status = await toolManager.EnsureInstalledAsync(CancellationToken.None);
 
 Console.WriteLine($"IsInstalled: {status.IsInstalled}");

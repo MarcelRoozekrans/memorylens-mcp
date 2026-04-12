@@ -9,7 +9,7 @@ public class FakeDotMemoryToolManager : DotMemoryToolManager
     public FakeDotMemoryToolManager(IProcessRunner processRunner, DotMemoryCommand? command = null)
         : base(processRunner)
     {
-        _command = command ?? new DotMemoryCommand("dotnet-dotmemory", "", "fake command", "1.0.0");
+        _command = command ?? new DotMemoryCommand("dotnet-dotmemory", "", "fake command", "1.0.0", DotMemoryCommandKind.GlobalTool);
     }
 
     public override Task<DotMemoryCommand?> ResolveCommandAsync(CancellationToken ct = default)

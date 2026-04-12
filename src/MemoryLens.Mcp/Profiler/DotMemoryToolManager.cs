@@ -4,11 +4,20 @@ namespace MemoryLens.Mcp.Profiler;
 
 public record ToolStatus(bool IsInstalled, string? Version, string Message);
 
+public enum DotMemoryCommandKind
+{
+    ExplicitPath,
+    PathDiscovery,
+    LocalTool,
+    GlobalTool
+}
+
 public sealed record DotMemoryCommand(
     string FileName,
     string ArgumentsPrefix,
     string DisplayName,
-    string? Version)
+    string? Version,
+    DotMemoryCommandKind Kind)
 {
     public string BuildArguments(string arguments) =>
         string.IsNullOrWhiteSpace(ArgumentsPrefix)
@@ -36,11 +45,8 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
         var command = await ResolveCommandAsync(ct).ConfigureAwait(false);
         if (command is not null)
         {
-            // Try to update global tool only if the resolved command is actually the global-tool shim
-            var isGlobalTool = command.FileName.Contains("dotnet-dotmemory") ||
-                              command.FileName.Contains("dotMemory") == false;
-
-            if (isGlobalTool)
+            // Only attempt global tool update when the resolved command is actually the global tool
+            if (command.Kind == DotMemoryCommandKind.GlobalTool)
             {
                 var globalToolResult = await TryRunAsync("dotnet", "tool list -g", ct).ConfigureAwait(false);
                 if (globalToolResult is not null && globalToolResult.ExitCode == 0 &&
@@ -138,14 +144,62 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
             if (LooksLikePath(candidate) && !File.Exists(candidate))
                 continue;
 
+            // For non-path candidates (commands without separators), validate with --version
+            if (!LooksLikePath(candidate))
+            {
+                var version = TryProbeSync(candidate);
+                if (version is null)
+                    continue;
+            }
+
             return new DotMemoryCommand(
                 candidate,
                 "",
                 $"{variableName} ({candidate})",
-                null);
+                null,
+                DotMemoryCommandKind.ExplicitPath);
         }
 
         return null;
+    }
+
+    private string? TryProbeSync(string fileName)
+    {
+        try
+        {
+            var startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = fileName,
+                Arguments = "--version",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = System.Diagnostics.Process.Start(startInfo);
+            if (process is null)
+                return null;
+
+            process.WaitForExit();
+
+            if (process.ExitCode != 0)
+                return null;
+
+            var output = process.StandardOutput.ReadToEnd();
+            var error = process.StandardError.ReadToEnd();
+            var text = string.IsNullOrWhiteSpace(output) ? error : output;
+
+            var firstLine = text
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .FirstOrDefault();
+
+            return firstLine ?? string.Empty;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private async Task<DotMemoryCommand?> ResolveFromPathAsync(CancellationToken ct)
@@ -159,7 +213,8 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
                     candidate,
                     "",
                     candidate,
-                    version);
+                    version,
+                    DotMemoryCommandKind.PathDiscovery);
             }
         }
 
@@ -176,7 +231,8 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
             "dotnet",
             "tool run dotnet-dotmemory --",
             "local tool manifest (dotnet tool run dotnet-dotmemory)",
-            ParseVersion(result.Output));
+            ParseVersion(result.Output),
+            DotMemoryCommandKind.LocalTool);
     }
 
     private async Task<DotMemoryCommand?> ResolveGlobalToolAsync(CancellationToken ct)
@@ -192,7 +248,8 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
                 shimPath,
                 "",
                 $"global tool shim ({shimPath})",
-                ParseVersion(result.Output));
+                ParseVersion(result.Output),
+                DotMemoryCommandKind.GlobalTool);
         }
 
         var probe = await TryProbeAsync("dotnet-dotmemory", ct).ConfigureAwait(false);
@@ -203,7 +260,8 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
             "dotnet-dotmemory",
             "",
             "global tool (dotnet-dotmemory)",
-            ParseVersion(result.Output));
+            ParseVersion(result.Output),
+            DotMemoryCommandKind.GlobalTool);
     }
 
     private static bool ContainsTool(string output) =>
