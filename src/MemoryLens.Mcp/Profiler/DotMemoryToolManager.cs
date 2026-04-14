@@ -2,10 +2,11 @@
 
 namespace MemoryLens.Mcp.Profiler;
 
-public record ToolStatus(bool IsInstalled, string? Version, string Message);
+public record ToolStatus(bool IsInstalled, string? Version, string Message, DotMemoryCommandKind? Kind = null);
 
 public enum DotMemoryCommandKind
 {
+    AutoInstalled,
     ExplicitPath,
     PathDiscovery,
     LocalTool,
@@ -25,7 +26,7 @@ public sealed record DotMemoryCommand(
             : $"{ArgumentsPrefix} {arguments}";
 }
 
-public class DotMemoryToolManager(IProcessRunner processRunner)
+public class DotMemoryToolManager(IProcessRunner processRunner, IDotMemoryAutoInstaller? autoInstaller = null)
 {
     private static readonly string[] ConfiguredPathVariables =
     [
@@ -45,7 +46,6 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
         var command = await ResolveCommandAsync(ct).ConfigureAwait(false);
         if (command is not null)
         {
-            // Only attempt global tool update when the resolved command is actually the global tool
             if (command.Kind == DotMemoryCommandKind.GlobalTool)
             {
                 var globalToolResult = await TryRunAsync("dotnet", "tool list -g", ct).ConfigureAwait(false);
@@ -54,17 +54,35 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
                 {
                     var version = ParseVersion(globalToolResult.Output);
                     await processRunner.RunAsync("dotnet", "tool update -g dotnet-dotmemory", ct).ConfigureAwait(false);
-                    return new ToolStatus(true, version, $"dotnet-dotmemory {version} is installed.");
+                    return new ToolStatus(true, version, $"dotnet-dotmemory {version} is installed.", DotMemoryCommandKind.GlobalTool);
                 }
             }
 
             return new ToolStatus(
                 true,
                 string.IsNullOrWhiteSpace(command.Version) ? null : command.Version,
-                $"{command.DisplayName} is available.");
+                $"{command.DisplayName} is available.",
+                command.Kind);
         }
 
-        // Legacy compatibility path: keep old install behavior as a fallback only.
+        // Try auto-install before legacy fallback
+        if (autoInstaller is not null)
+        {
+            var unsupportedMsg = autoInstaller.GetUnsupportedPlatformMessage();
+            if (unsupportedMsg is not null)
+                return new ToolStatus(false, null, unsupportedMsg);
+
+            var autoPath = await autoInstaller.InstallLatestAsync(ct).ConfigureAwait(false);
+            if (autoPath is not null)
+            {
+                InvalidateCache();
+                command = await ResolveCommandAsync(ct).ConfigureAwait(false);
+                if (command is not null)
+                    return new ToolStatus(true, command.Version, $"{command.DisplayName} is available.", command.Kind);
+            }
+        }
+
+        // Legacy compatibility path
         var installResult = await processRunner
             .RunAsync("dotnet", "tool install -g dotnet-dotmemory", ct)
             .ConfigureAwait(false);
@@ -76,28 +94,16 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
                 "put dotMemory in PATH, or install dotnet-dotmemory.";
 
             if (!string.IsNullOrWhiteSpace(installResult.Error))
-            {
                 errorMessage += $" Details: {installResult.Error}";
-            }
 
-            return new ToolStatus(
-                false,
-                null,
-                errorMessage);
+            return new ToolStatus(false, null, errorMessage);
         }
 
         command = await ResolveCommandAsync(ct).ConfigureAwait(false);
         if (command is not null)
-        {
-            return new ToolStatus(
-                true,
-                string.IsNullOrWhiteSpace(command.Version) ? null : command.Version,
-                $"{command.DisplayName} is available.");
-        }
+            return new ToolStatus(true, command.Version, $"{command.DisplayName} is available.", command.Kind);
 
-        return new ToolStatus(
-            false,
-            null,
+        return new ToolStatus(false, null,
             "dotnet-dotmemory was installed, but the executable could not be resolved. " +
             "Add the .NET tools directory to PATH or set DOTMEMORY_PATH explicitly.");
     }
@@ -108,25 +114,16 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
             return _cachedCommand;
 
         var configured = ResolveConfiguredPath();
-        if (configured is not null)
-        {
-            _cachedCommand = configured;
-            return configured;
-        }
+        if (configured is not null) { _cachedCommand = configured; return configured; }
+
+        var autoInstalled = await ResolveAutoInstalledAsync(ct).ConfigureAwait(false);
+        if (autoInstalled is not null) { _cachedCommand = autoInstalled; return autoInstalled; }
 
         var fromPath = await ResolveFromPathAsync(ct).ConfigureAwait(false);
-        if (fromPath is not null)
-        {
-            _cachedCommand = fromPath;
-            return fromPath;
-        }
+        if (fromPath is not null) { _cachedCommand = fromPath; return fromPath; }
 
         var localTool = await ResolveLocalToolAsync(ct).ConfigureAwait(false);
-        if (localTool is not null)
-        {
-            _cachedCommand = localTool;
-            return localTool;
-        }
+        if (localTool is not null) { _cachedCommand = localTool; return localTool; }
 
         var globalTool = await ResolveGlobalToolAsync(ct).ConfigureAwait(false);
         _cachedCommand = globalTool;
@@ -136,6 +133,23 @@ public class DotMemoryToolManager(IProcessRunner processRunner)
     public void InvalidateCache()
     {
         _cachedCommand = null;
+    }
+
+    private async Task<DotMemoryCommand?> ResolveAutoInstalledAsync(CancellationToken ct)
+    {
+        if (autoInstaller is null)
+            return null;
+
+        var path = await autoInstaller.GetCachedPathAsync(ct).ConfigureAwait(false);
+        if (path is null)
+            return null;
+
+        return new DotMemoryCommand(
+            path,
+            "",
+            $"auto-installed dotMemory ({path})",
+            null,
+            DotMemoryCommandKind.AutoInstalled);
     }
 
     private DotMemoryCommand? ResolveConfiguredPath()

@@ -119,4 +119,66 @@ public class DotMemoryToolManagerTests
         Assert.True(result.IsInstalled);
         Assert.Contains("Explicit Path CLI", result.Message);
     }
+
+    [Fact]
+    public async Task ResolveCommand_ReturnsAutoInstalled_WhenCacheHit()
+    {
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            var autoInstaller = new FakeDotMemoryAutoInstaller(cachedPath: tempFile);
+            var manager = new DotMemoryToolManager(new FakeProcessRunner(exitCode: 1, output: ""), autoInstaller);
+
+            var command = await manager.ResolveCommandAsync(TestContext.Current.CancellationToken);
+
+            Assert.NotNull(command);
+            Assert.Equal(tempFile, command.FileName);
+            Assert.Equal(DotMemoryCommandKind.AutoInstalled, command.Kind);
+        }
+        finally { File.Delete(tempFile); }
+    }
+
+    [Fact]
+    public async Task EnsureInstalled_CallsInstallLatest_WhenCacheMiss()
+    {
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            var autoInstaller = new FakeDotMemoryAutoInstaller(cachedPath: null, installPath: tempFile);
+            var manager = new DotMemoryToolManager(new FakeProcessRunner(exitCode: 1, output: ""), autoInstaller);
+
+            var result = await manager.EnsureInstalledAsync(TestContext.Current.CancellationToken);
+
+            Assert.True(result.IsInstalled);
+            Assert.Equal(DotMemoryCommandKind.AutoInstalled, result.Kind);
+        }
+        finally { File.Delete(tempFile); }
+    }
+
+    [Fact]
+    public async Task EnsureInstalled_FallsThrough_WhenInstallLatestFails()
+    {
+        var autoInstaller = new FakeDotMemoryAutoInstaller(cachedPath: null, installPath: null);
+        var runner = new FakeProcessRunner(exitCode: 1, output: "");
+        var manager = new DotMemoryToolManager(runner, autoInstaller);
+
+        var result = await manager.EnsureInstalledAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(result.IsInstalled);
+    }
+
+    [Fact]
+    public async Task EnsureInstalled_ReturnsUnsupportedMessage_WhenPlatformNotSupported()
+    {
+        var autoInstaller = new FakeDotMemoryAutoInstaller(
+            unsupportedMessage: "Platform freebsd-x64 is not supported.");
+        var runner = new FakeProcessRunner(exitCode: 1, output: "");
+        var manager = new DotMemoryToolManager(runner, autoInstaller);
+
+        var result = await manager.EnsureInstalledAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(result.IsInstalled);
+        Assert.Contains("freebsd-x64", result.Message);
+        Assert.Equal(0, autoInstaller.InstallLatestAsyncCallCount);
+    }
 }
