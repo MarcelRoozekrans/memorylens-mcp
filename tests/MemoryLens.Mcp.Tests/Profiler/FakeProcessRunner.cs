@@ -5,10 +5,12 @@ namespace MemoryLens.Mcp.Tests.Profiler;
 public class FakeProcessRunner : IProcessRunner
 {
     private readonly Queue<ProcessResult> _results = new();
+    private readonly ProcessResult _defaultResult;
 
     public FakeProcessRunner(int exitCode, string output)
     {
-        _results.Enqueue(new ProcessResult(exitCode, output, ""));
+        _defaultResult = new ProcessResult(exitCode, output, "");
+        _results.Enqueue(_defaultResult);
     }
 
     public void SetNextResult(int exitCode, string output)
@@ -21,7 +23,7 @@ public class FakeProcessRunner : IProcessRunner
     {
         var result = _results.Count > 0
             ? _results.Dequeue()
-            : new ProcessResult(0, "", "");
+            : _defaultResult;
         return Task.FromResult(result);
     }
 }

@@ -12,6 +12,7 @@ builder.Logging.AddConsole(options =>
 });
 
 builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
+// TODO: register DotMemoryAutoInstaller in DI (Task 6)
 builder.Services.AddSingleton<DotMemoryToolManager>();
 builder.Services.AddSingleton<ProcessFilter>();
 builder.Services.AddSingleton<SnapshotManager>();

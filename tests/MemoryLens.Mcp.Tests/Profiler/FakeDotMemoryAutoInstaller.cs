@@ -7,11 +7,24 @@ public class FakeDotMemoryAutoInstaller(
     string? installPath = null,
     string? unsupportedMessage = null) : IDotMemoryAutoInstaller
 {
-    public Task<string?> GetCachedPathAsync(CancellationToken ct) =>
-        Task.FromResult(cachedPath);
+    private bool _installed;
 
-    public Task<string?> InstallLatestAsync(CancellationToken ct) =>
-        Task.FromResult(installPath);
+    public int InstallLatestAsyncCallCount { get; private set; }
+
+    public Task<string?> GetCachedPathAsync(CancellationToken ct)
+    {
+        // After InstallLatestAsync has been called successfully, return the installPath as cached.
+        var result = _installed ? installPath : cachedPath;
+        return Task.FromResult(result);
+    }
+
+    public Task<string?> InstallLatestAsync(CancellationToken ct)
+    {
+        InstallLatestAsyncCallCount++;
+        if (installPath is not null)
+            _installed = true;
+        return Task.FromResult(installPath);
+    }
 
     public string? GetUnsupportedPlatformMessage() => unsupportedMessage;
 }
