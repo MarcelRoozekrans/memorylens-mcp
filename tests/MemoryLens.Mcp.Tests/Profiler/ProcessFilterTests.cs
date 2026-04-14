@@ -12,6 +12,9 @@ public class ProcessFilterTests
     [InlineData("code-insiders", true)]
     [InlineData("ServiceHub.Host", true)]
     [InlineData("dotnet-dotmemory", true)]
+    [InlineData("dotMemory", true)]
+    [InlineData("dotMemory.exe", true)]
+    [InlineData("dotMemory.sh", true)]
     [InlineData("MyApp", false)]
     [InlineData("WebApi", false)]
     public void IsExcluded_FiltersCorrectly(string processName, bool expectedExcluded)

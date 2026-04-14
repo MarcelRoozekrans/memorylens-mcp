@@ -11,6 +11,9 @@ public class ProcessFilter
         "code-insiders",
         "ServiceHub",
         "dotnet-dotmemory",
+        "dotMemory",
+        "dotMemory.exe",
+        "dotMemory.sh",
         "MemoryLens.Mcp"
     ];
 

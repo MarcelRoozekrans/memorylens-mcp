@@ -2,7 +2,10 @@ using System.Globalization;
 
 namespace MemoryLens.Mcp.Profiler;
 
-public class SnapshotManager(IProcessRunner processRunner, ProcessFilter processFilter)
+public class SnapshotManager(
+    IProcessRunner processRunner,
+    ProcessFilter processFilter,
+    DotMemoryToolManager dotMemoryToolManager)
 {
     private readonly string _snapshotDir = Path.Combine(Path.GetTempPath(), "memorylens-snapshots");
 
@@ -38,10 +41,22 @@ public class SnapshotManager(IProcessRunner processRunner, ProcessFilter process
             await Task.Delay(TimeSpan.FromSeconds(durationSeconds.Value), ct).ConfigureAwait(false);
         }
 
-        var result = await processRunner.RunAsync("dotnet-dotmemory", arguments, ct).ConfigureAwait(false);
+        var commandInfo = await dotMemoryToolManager.ResolveCommandAsync(ct).ConfigureAwait(false);
+        if (commandInfo is null)
+        {
+            return new SnapshotResult(
+                false,
+                null,
+                null,
+                "dotMemory CLI not found. Run ensure_dotmemory, set DOTMEMORY_PATH or MEMORYLENS_DOTMEMORY_PATH, or ensure dotMemory is available on PATH.");
+        }
+
+        var result = await processRunner
+            .RunAsync(commandInfo.FileName, commandInfo.BuildArguments(arguments), ct)
+            .ConfigureAwait(false);
 
         if (result.ExitCode != 0)
-            return new SnapshotResult(false, null, null, $"dotnet-dotmemory failed: {result.Error}");
+            return new SnapshotResult(false, null, null, $"dotMemory CLI failed: {result.Error}");
 
         var snapshotPath = FindSnapshotFile(snapshotName);
 
@@ -64,9 +79,23 @@ public class SnapshotManager(IProcessRunner processRunner, ProcessFilter process
         var beforeName = $"before-{comparisonId}";
         var afterName = $"after-{comparisonId}";
 
+        var commandInfo = await dotMemoryToolManager.ResolveCommandAsync(ct).ConfigureAwait(false);
+        if (commandInfo is null)
+        {
+            return new ComparisonResult(
+                false,
+                null,
+                null,
+                null,
+                0,
+                "dotMemory CLI not found. Run ensure_dotmemory, set DOTMEMORY_PATH or MEMORYLENS_DOTMEMORY_PATH, or make dotMemory available on PATH.");
+        }
+
         // Take before snapshot
         var beforeArgs = BuildSnapshotArguments(pid, processName, command, beforeName);
-        var beforeResult = await processRunner.RunAsync("dotnet-dotmemory", beforeArgs, ct).ConfigureAwait(false);
+        var beforeResult = await processRunner
+            .RunAsync(commandInfo.FileName, commandInfo.BuildArguments(beforeArgs), ct)
+            .ConfigureAwait(false);
 
         if (beforeResult.ExitCode != 0)
             return new ComparisonResult(false, null, null, null, 0, $"Before snapshot failed: {beforeResult.Error}");
@@ -80,7 +109,9 @@ public class SnapshotManager(IProcessRunner processRunner, ProcessFilter process
 
         // Take after snapshot
         var afterArgs = BuildSnapshotArguments(pid, processName, command, afterName);
-        var afterResult = await processRunner.RunAsync("dotnet-dotmemory", afterArgs, ct).ConfigureAwait(false);
+        var afterResult = await processRunner
+            .RunAsync(commandInfo.FileName, commandInfo.BuildArguments(afterArgs), ct)
+            .ConfigureAwait(false);
 
         if (afterResult.ExitCode != 0)
             return new ComparisonResult(false, comparisonId, beforePath, null, 1, $"After snapshot failed: {afterResult.Error}");
