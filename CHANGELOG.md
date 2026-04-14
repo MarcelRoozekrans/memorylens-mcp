@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.5.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.4.0...v1.5.0) (2026-04-14)
+
+
+### Features
+
+* add DotMemoryAutoInstaller with platform mapping ([6e2c4fc](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/6e2c4fc48b683554d877d621e3219dfb9b18a561))
+* add IDotMemoryAutoInstaller interface and fake ([203d61b](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/203d61b0d6e8bbe35ea47142269c20bf9813606c))
+* auto-download JetBrains dotMemory Console on first use ([4a6c7da](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/4a6c7dad6e48af7292fa1ecfc798391d1bd561e4))
+* implement InstallLatestAsync with NuGet download and extraction ([72979a4](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/72979a4d0c5ab352a265e77744289bfadd877bf6))
+* register DotMemoryAutoInstaller in DI ([bc0155f](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/bc0155fa2b650f5ea6e19266a2b69a86565e5c9c))
+* wire IDotMemoryAutoInstaller into DotMemoryToolManager ([679f06d](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/679f06db90f2e6f7831fe2cc90c15d0bf84d9087))
+
+
+### Bug Fixes
+
+* cleanup on chmod failure, explicit DI wiring, retry on corrupt extraction ([925bf76](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/925bf761c2d73bbd5687806b1fde8bcdb5a719d9))
+
 ## [1.4.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.3.5...v1.4.0) (2026-04-14)
 
 
