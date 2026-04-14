@@ -16,15 +16,24 @@ public class ToolIntegrationTests
     [Fact]
     public async Task EnsureDotMemory_ReturnsInstalledMessage()
     {
-        var runner = new FakeProcessRunner(
-            exitCode: 0,
-            output: "dotnet-dotmemory  2024.3.5  dotnet-dotmemory");
-        var manager = new DotMemoryToolManager(runner);
-        var tool = new EnsureDotMemoryTool(manager);
+        var savedPath = Environment.GetEnvironmentVariable("DOTMEMORY_PATH");
+        Environment.SetEnvironmentVariable("DOTMEMORY_PATH", null);
+        try
+        {
+            var runner = new FakeProcessRunner(
+                exitCode: 0,
+                output: "dotnet-dotmemory  2024.3.5  dotnet-dotmemory");
+            var manager = new DotMemoryToolManager(runner);
+            var tool = new EnsureDotMemoryTool(manager);
 
-        var result = await tool.ensure_dotmemory(TestContext.Current.CancellationToken);
+            var result = await tool.ensure_dotmemory(TestContext.Current.CancellationToken);
 
-        Assert.Contains("2024.3.5", result);
+            Assert.Contains("2024.3.5", result);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("DOTMEMORY_PATH", savedPath);
+        }
     }
 
     [Fact]
