@@ -124,31 +124,37 @@ public class DotMemoryAutoInstaller(HttpClient httpClient, string? cacheRoot = n
 
         var versionDir = Path.Combine(_cacheRoot, version);
 
-        if (!Directory.Exists(versionDir))
+        string? exePath = null;
+        for (var attempt = 0; attempt < 2 && exePath is null; attempt++)
         {
+            if (Directory.Exists(versionDir))
+                Directory.Delete(versionDir, recursive: true);
+
             try
             {
                 await DownloadAndExtractAsync(packageId, version, versionDir, ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException) { throw; }
-            catch
-            {
-                if (Directory.Exists(versionDir))
-                    Directory.Delete(versionDir, recursive: true);
-                return null;
-            }
+            catch { continue; }
+
+            exePath = FindExecutable(versionDir);
         }
 
-        var exePath = FindExecutable(versionDir);
         if (exePath is null || !File.Exists(exePath))
         {
-            Directory.Delete(versionDir, recursive: true);
+            if (Directory.Exists(versionDir))
+                Directory.Delete(versionDir, recursive: true);
             return null;
         }
 
         try { await MakeExecutableAsync(exePath).ConfigureAwait(false); }
         catch (OperationCanceledException) { throw; }
-        catch { return null; }
+        catch
+        {
+            if (Directory.Exists(versionDir))
+                Directory.Delete(versionDir, recursive: true);
+            return null;
+        }
 
         Directory.CreateDirectory(_cacheRoot);
         await File.WriteAllTextAsync(Path.Combine(_cacheRoot, "current.txt"), version, ct).ConfigureAwait(false);

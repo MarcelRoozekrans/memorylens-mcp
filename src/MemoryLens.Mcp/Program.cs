@@ -16,7 +16,9 @@ builder.Services.AddHttpClient<DotMemoryAutoInstaller>();
 builder.Services.AddSingleton<IDotMemoryAutoInstaller>(sp =>
     new DotMemoryAutoInstaller(
         sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(DotMemoryAutoInstaller))));
-builder.Services.AddSingleton<DotMemoryToolManager>();
+builder.Services.AddSingleton<DotMemoryToolManager>(sp => new DotMemoryToolManager(
+    sp.GetRequiredService<IProcessRunner>(),
+    sp.GetRequiredService<IDotMemoryAutoInstaller>()));
 builder.Services.AddSingleton<ProcessFilter>();
 builder.Services.AddSingleton<SnapshotManager>();
 builder.Services.AddSingleton<MemoryLensConfig>(sp =>
