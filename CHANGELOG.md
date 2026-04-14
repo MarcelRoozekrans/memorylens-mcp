@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.1](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.5.0...v1.5.1) (2026-04-14)
+
+
+### Bug Fixes
+
+* fall back to --help for dotMemory CLI version probe ([3291d58](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/3291d58aa1439342059c8ebf3538f3741ea15dac))
+* fall back to --help for dotMemory CLI version probe ([89d068a](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/89d068a8deaa2cd4d36c2907bb26cf2b5dfa6f61)), closes [#44](https://github.com/MarcelRoozekrans/memorylens-mcp/issues/44)
+
 ## [1.5.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.4.0...v1.5.0) (2026-04-14)
 
 
