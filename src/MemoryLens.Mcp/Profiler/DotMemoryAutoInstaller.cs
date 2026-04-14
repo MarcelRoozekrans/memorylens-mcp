@@ -179,10 +179,16 @@ public class DotMemoryAutoInstaller(HttpClient httpClient, string? cacheRoot = n
                 .ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
-            await using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-            await using var fs = File.Create(tempFile);
-            await stream.CopyToAsync(fs, ct).ConfigureAwait(false);
-            fs.Close();
+            var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            await using (stream.ConfigureAwait(false))
+            {
+                var fs = File.Create(tempFile);
+                await using (fs.ConfigureAwait(false))
+                {
+                    await stream.CopyToAsync(fs, ct).ConfigureAwait(false);
+                    await fs.FlushAsync(ct).ConfigureAwait(false);
+                }
+            }
 
             Directory.CreateDirectory(versionDir);
             System.IO.Compression.ZipFile.ExtractToDirectory(tempFile, versionDir, overwriteFiles: true);

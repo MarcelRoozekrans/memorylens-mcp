@@ -64,50 +64,51 @@ dotnet tool install -g MemoryLens.Mcp
 
 ## dotMemory CLI Installation
 
-MemoryLens MCP supports multiple ways to install and use JetBrains dotMemory CLI:
+MemoryLens MCP automatically downloads and caches the JetBrains dotMemory CLI on first use via the `ensure_dotmemory` tool — no manual installation required on supported platforms.
 
-### Option 1: Official JetBrains dotMemory CLI (Recommended)
+### Supported Platforms (auto-download)
 
-Use the official dotMemory CLI from JetBrains Toolbox or direct download:
+| Platform | Architecture |
+|---|---|
+| Windows | x64, x86, ARM64 |
+| Linux (glibc) | x64, ARM64, ARM |
+| Linux (musl) | x64, ARM64 |
+| macOS | x64 (Intel), ARM64 (Apple Silicon) |
 
-**JetBrains Toolbox (Linux/macOS):**
+### Cache Location
+
+Downloaded binaries are cached at `~/.memorylens/tools/dotmemory/{version}/`. Old versions are not auto-removed — delete the directory manually to free disk space.
+
+### Unsupported Platforms
+
+Platforms not listed above (e.g. FreeBSD, Linux x86) cannot use auto-download. Set `DOTMEMORY_PATH` to point to an existing dotMemory CLI executable:
+
 ```bash
-# Set DOTMEMORY_PATH to point to your JetBrains Toolbox installation
-export DOTMEMORY_PATH="$HOME/.local/share/JetBrains/Toolbox/apps/rider/tools/profiler/dotMemory.sh"
+export DOTMEMORY_PATH="/path/to/dotMemory.sh"   # Linux/macOS
+set DOTMEMORY_PATH=C:\path\to\dotMemory.exe      # Windows
 ```
 
-**JetBrains Toolbox (Windows):**
-```cmd
-set DOTMEMORY_PATH=%LOCALAPPDATA%\JetBrains\Toolbox\apps\rider\tools\profiler\dotMemory.exe
-```
+Find dotMemory CLI in JetBrains Toolbox:
+- Linux: `~/.local/share/JetBrains/Toolbox/apps/rider/tools/profiler/dotMemory.sh`
+- Windows: `%LOCALAPPDATA%\JetBrains\Toolbox\apps\rider\tools\profiler\dotMemory.exe`
 
-**Direct Installation:**
-Download dotMemory from [jetbrains.com](https://www.jetbrains.com/dotmemory/download/) and set DOTMEMORY_PATH to the CLI executable:
-- Linux/macOS: `<install_dir>/bin/dotMemory.sh`
-- Windows: `<install_dir>\bin\dotMemory.exe`
+### Manual Fallback Discovery
 
-### Option 2: PATH Discovery
+If auto-download is unavailable, MemoryLens MCP falls back through these discovery modes in order:
 
-If dotMemory CLI is in your system PATH, MemoryLens MCP will automatically discover it by searching for:
-- Linux/macOS: `dotMemory.sh`, `dotMemory`
-- Windows: `dotMemory.exe`
+1. **`DOTMEMORY_PATH` environment variable** — explicit path to the CLI executable
+2. **System PATH** — searches for `dotMemory.sh` / `dotMemory` (Linux/macOS) or `dotMemory.exe` (Windows)
+3. **Local .NET tool manifest** — `dotnet tool install dotnet-dotmemory --local`
+4. **Global .NET tool** — `dotnet tool install -g dotnet-dotmemory` (legacy fallback)
 
-### Option 3: Local Tool Manifest
+### Error Scenarios
 
-Use dotMemory as a local .NET tool in your project:
-```bash
-dotnet new tool-manifest
-dotnet tool install dotnet-dotmemory --local
-```
-
-### Option 4: Global Tool (Legacy)
-
-Install as a global .NET tool (legacy fallback):
-```bash
-dotnet tool install -g dotnet-dotmemory
-```
-
-**Note:** The `dotnet-dotmemory` global tool is not distributed by JetBrains and may not be available in all NuGet feeds. Official JetBrains dotMemory CLI (Option 1) is recommended.
+| Error | Cause | Fix |
+|---|---|---|
+| `Platform '...' is not supported` | Unsupported OS/arch | Set `DOTMEMORY_PATH` |
+| Network/download failure | No internet / NuGet unreachable | Set `DOTMEMORY_PATH` or retry `ensure_dotmemory` |
+| `chmod +x failed` | Read-only filesystem | Set `DOTMEMORY_PATH` to a writable location |
+| `dotMemory CLI not found` | All discovery modes failed | Run `ensure_dotmemory` or set `DOTMEMORY_PATH` |
 
 ## Available MCP Tools
 
