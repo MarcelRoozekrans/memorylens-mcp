@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.3.5...v1.4.0) (2026-04-14)
+
+
+### Features
+
+* support official JetBrains dotMemory CLI via DOTMEMORY_PATH ([518e00d](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/518e00d8096df06677176169d341910e607c4913))
+
+
+### Bug Fixes
+
+* isolate DOTMEMORY_PATH env var in EnsureDotMemory test ([82e6423](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/82e642319f0fcce3ff65a9be22a6bff061859e8b))
+* use FakeDotMemoryToolManager in EnsureDotMemory integration test ([33036d3](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/33036d37b148b97aca513eca5b646f9ceb97dc91))
+
 ## [1.3.5](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.3.4...v1.3.5) (2026-03-31)
 
 
