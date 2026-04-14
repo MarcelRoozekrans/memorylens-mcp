@@ -181,4 +181,22 @@ public class DotMemoryToolManagerTests
         Assert.Contains("freebsd-x64", result.Message);
         Assert.Equal(0, autoInstaller.InstallLatestAsyncCallCount);
     }
+
+    [Fact]
+    public async Task ResolveCommand_UsesHelpFallback_WhenVersionCommandFails()
+    {
+        // Arrange: --version exits non-zero (new JetBrains CLI), --help succeeds
+        const string helpOutput =
+            "dotMemory Console Profiler 2026.1.0.1 build 261.0.20260408.225500. Copyright (C) 2017-2026 JetBrains s.r.o.";
+        var runner = new FakeProcessRunner(exitCode: 1, output: "");  // --version fails
+        runner.SetNextResult(exitCode: 0, output: helpOutput);          // --help succeeds
+
+        var manager = new DotMemoryToolManager(runner);
+
+        var command = await manager.ResolveCommandAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(command);
+        Assert.Equal(DotMemoryCommandKind.PathDiscovery, command.Kind);
+        Assert.Contains("dotMemory", command.Version, StringComparison.OrdinalIgnoreCase);
+    }
 }

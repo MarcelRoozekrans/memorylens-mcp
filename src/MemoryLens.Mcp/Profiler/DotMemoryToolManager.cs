@@ -181,12 +181,26 @@ public class DotMemoryToolManager(IProcessRunner processRunner, IDotMemoryAutoIn
 
     private string? TryProbeSync(string fileName)
     {
+        var firstLine = RunSync(fileName, "--version");
+        if (firstLine is not null)
+            return firstLine;
+
+        // The new JetBrains dotMemory CLI does not support --version; try --help instead.
+        var helpFirstLine = RunSync(fileName, "--help");
+        if (helpFirstLine is not null && helpFirstLine.Contains("dotMemory", StringComparison.OrdinalIgnoreCase))
+            return helpFirstLine;
+
+        return null;
+    }
+
+    private static string? RunSync(string fileName, string arguments)
+    {
         try
         {
             var startInfo = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = fileName,
-                Arguments = "--version",
+                Arguments = arguments,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -206,11 +220,9 @@ public class DotMemoryToolManager(IProcessRunner processRunner, IDotMemoryAutoIn
             var error = process.StandardError.ReadToEnd();
             var text = string.IsNullOrWhiteSpace(output) ? error : output;
 
-            var firstLine = text
+            return text
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .FirstOrDefault();
-
-            return firstLine ?? string.Empty;
+                .FirstOrDefault() ?? string.Empty;
         }
         catch
         {
@@ -308,20 +320,31 @@ public class DotMemoryToolManager(IProcessRunner processRunner, IDotMemoryAutoIn
         if (result is null)
             return null;
 
-        // Require successful exit code to validate this is actually dotMemory
-        if (result.ExitCode != 0)
+        if (result.ExitCode == 0)
+        {
+            var text = string.IsNullOrWhiteSpace(result.Output) ? result.Error : result.Output;
+            var firstLine = text
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .FirstOrDefault();
+            return firstLine ?? string.Empty;
+        }
+
+        // The new JetBrains dotMemory CLI (dotMemory.exe / dotMemory.sh) does not support
+        // --version and exits non-zero. Fall back to --help, which prints the version on the
+        // first line: "dotMemory Console Profiler 2026.1.0.1 build ..."
+        var helpResult = await TryRunAsync(fileName, "--help", ct).ConfigureAwait(false);
+        if (helpResult is null)
             return null;
 
-        var text = string.IsNullOrWhiteSpace(result.Output)
-            ? result.Error
-            : result.Output;
-
-        var firstLine = text
+        var helpText = string.IsNullOrWhiteSpace(helpResult.Output) ? helpResult.Error : helpResult.Output;
+        var helpFirstLine = helpText
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .FirstOrDefault();
+            .FirstOrDefault() ?? string.Empty;
 
-        // Non-null means "process started", even if it doesn't print version.
-        return firstLine ?? string.Empty;
+        // Only accept if the output identifies this as a dotMemory binary.
+        return helpFirstLine.Contains("dotMemory", StringComparison.OrdinalIgnoreCase)
+            ? helpFirstLine
+            : null;
     }
 
     private async Task<ProcessResult?> TryRunAsync(string fileName, string arguments, CancellationToken ct)
