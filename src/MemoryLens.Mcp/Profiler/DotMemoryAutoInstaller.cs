@@ -102,6 +102,7 @@ public class DotMemoryAutoInstaller(HttpClient httpClient, string? cacheRoot = n
 
     // --- Download & install ---
 
+    // Not thread-safe: concurrent calls to the same cache root may corrupt extraction.
     public async Task<string?> InstallLatestAsync(CancellationToken ct)
     {
         var rid = GetRid();
@@ -155,14 +156,16 @@ public class DotMemoryAutoInstaller(HttpClient httpClient, string? cacheRoot = n
         return exePath;
     }
 
-    public async Task<string?> FetchLatestVersionAsync(string packageId, CancellationToken ct)
+    internal async Task<string?> FetchLatestVersionAsync(string packageId, CancellationToken ct)
     {
         var url = $"https://api.nuget.org/v3-flatcontainer/{packageId}/index.json";
         var json = await httpClient.GetStringAsync(url, ct).ConfigureAwait(false);
         using var doc = System.Text.Json.JsonDocument.Parse(json);
         var versions = doc.RootElement.GetProperty("versions");
-        var last = versions[versions.GetArrayLength() - 1].GetString();
-        return last;
+        var length = versions.GetArrayLength();
+        if (length == 0)
+            return null;
+        return versions[length - 1].GetString();
     }
 
     private async Task DownloadAndExtractAsync(string packageId, string version, string versionDir, CancellationToken ct)
