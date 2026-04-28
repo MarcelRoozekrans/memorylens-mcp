@@ -1,3 +1,5 @@
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/MarcelRoozekrans?style=flat&logo=githubsponsors&color=ea4aaa&label=Sponsor)](https://github.com/sponsors/MarcelRoozekrans)
+
 <p align="center">
   <img src="icon.svg" width="128" height="128" alt="MemoryLens MCP">
 </p>
