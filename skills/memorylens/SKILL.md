@@ -30,7 +30,8 @@ Call `ensure_dotmemory`. If it fails, stop and report the error.
 ### Step 2: Identify target
 
 Ask the user what to profile:
-- **Running process**: Call `list_processes` and let user pick
+- **Running process**: Call `list_processes` and let user pick. It needs no profiler,
+  so it is also safe to call before step 1 to check there is a target at all
 - **Launch command**: User provides a `dotnet run` command or similar
 - **Both**: Attach to running OR launch — user's choice
 
