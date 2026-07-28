@@ -17,6 +17,7 @@ allocate a TTY:
 
 ```bash
 docker run -i --rm --pid=host --cap-add=SYS_PTRACE \
+  -v /tmp:/tmp \
   -v "$PWD:/workspace" \
   -v memorylens-tools:/root/.memorylens \
   memorylens-mcp
@@ -24,10 +25,18 @@ docker run -i --rm --pid=host --cap-add=SYS_PTRACE \
 
 | Flag | Why |
 |---|---|
-| `--pid=host` | Without it `list_processes` sees only the container's own PIDs, so there is nothing to profile. |
-| `--cap-add=SYS_PTRACE` | dotMemory attaches to a running process; that needs `ptrace`, which Docker drops by default. |
+| `-v /tmp:/tmp` | How the target is **found**. `list_processes` reads the diagnostic sockets the runtime writes to its temp directory, and a PID namespace does not share a filesystem — so without this the list is empty no matter what `--pid` says. |
+| `--pid=host` | How the target is **attached to**. dotMemory can only profile a process in a PID namespace it shares. |
+| `--cap-add=SYS_PTRACE` | Attaching needs `ptrace`, which Docker drops by default. |
 | `-v memorylens-tools:/root/.memorylens` | Persists the dotMemory CLI that `ensure_dotmemory` downloads (~hundreds of MB) so it is fetched once, not per container start. |
 | `-v "$PWD:/workspace"` | `.memorylens.json` is read from the working directory, and snapshots are written there. |
+
+The first two are independent and both are required: sharing only `/tmp` lists
+processes you then cannot attach to, and sharing only the PID namespace attaches
+to processes you cannot discover.
+
+If the target sets `TMPDIR`, mount that directory instead — the runtime places
+the socket wherever `TMPDIR` points.
 
 ## MCP client configuration
 
@@ -40,6 +49,7 @@ docker run -i --rm --pid=host --cap-add=SYS_PTRACE \
       "args": [
         "run", "-i", "--rm",
         "--pid=host", "--cap-add=SYS_PTRACE",
+        "-v", "/tmp:/tmp",
         "-v", "/absolute/path/to/your/repo:/workspace",
         "-v", "memorylens-tools:/root/.memorylens",
         "memorylens-mcp"
@@ -57,11 +67,9 @@ extracts it under `$HOME/.memorylens` — so a cold container needs network
 access, and the `/root/.memorylens` volume is what stops it re-downloading on
 every start.
 
-Calling `list_processes` before `ensure_dotmemory` fails with *"Could not execute
-because the specified command or file was not found"*: it shells out to
-`dotnet dotmemory list-processes`, which needs a `dotnet-dotmemory` command on
-`PATH`. This is not container-specific — it behaves the same way on a host
-without that tool.
+`list_processes` is the exception and needs no profiler — it discovers targets
+from their diagnostic sockets — so it is a good first call to confirm the mounts
+are right before paying for the download.
 
 The image is SDK-based rather than `dotnet/runtime` because `DotMemoryToolManager`
 falls back to `dotnet tool install`, which requires the SDK.
@@ -78,10 +86,11 @@ docker run -i --rm -v "${PWD}:/workspace" memorylens-mcp
 
 ## Limitations
 
-- **The target process must be reachable.** A containerized profiler can only
-  attach to processes in a PID namespace it shares. `--pid=host` covers processes
-  on the Docker host; profiling a process in a *different* container additionally
-  needs `--pid=container:<id>`.
+- **The target process must be both discoverable and reachable.** Discovery reads
+  the target's temp directory; attaching needs a shared PID namespace. For a
+  process in another container that means `--pid=container:<id>` *and* a volume
+  shared with that container's `/tmp` — sharing the PID namespace alone yields an
+  empty list, because the socket lives on a filesystem you cannot see.
 - **Docker Desktop hosts are a VM.** On Windows and macOS `--pid=host` is the
   Linux VM's namespace, not your desktop's, so a .NET app running natively on
   Windows or macOS is not visible. Use the [global tool](../README.md#net-global-tool)
