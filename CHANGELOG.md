@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.7.0...v1.7.1) (2026-07-28)
+
+
+### Bug Fixes
+
+* **ci:** retry MCP Registry publish, re-authenticating each attempt ([#121](https://github.com/MarcelRoozekrans/memorylens-mcp/issues/121)) ([415357a](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/415357a78986abc7a87bc6d3b70ec9f45a4e47b6))
+
 ## [1.7.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.6.0...v1.7.0) (2026-07-28)
 
 
