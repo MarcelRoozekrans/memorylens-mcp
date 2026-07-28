@@ -18,10 +18,14 @@ jobs:
       version: ${{ steps.release.outputs.version }}
     steps:
       - name: Release Please
+        # No `release-type` input: passing it puts the action in single-package mode,
+        # where release-please-config.json is ignored entirely and its `extra-files`
+        # never run. That is why server.json sat at 1.3.4 while the manifest reached
+        # 1.5.1. The config file already declares "release-type": "simple", so dropping
+        # the input changes nothing else.
         uses: googleapis/release-please-action@v5
         id: release
         with:
-          release-type: simple
           token: ${{ secrets.GITHUB_TOKEN }}
 
   publish:
@@ -35,6 +39,12 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - uses: actions/setup-node@v7
+        with:
+          # npm >= 11.5.1 is required for trusted publishing (OIDC); Node 24 ships it.
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
       - name: Build
         run: dotnet build -c Release -p:Version=${{ needs.release-please.outputs.version }}
 
@@ -47,6 +57,14 @@ jobs:
 
       - name: Push to NuGet
         run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      # The npm package is a launcher that installs the NuGet tool at a matching
+      # version, so it must be published after the NuGet push, never before.
+      # Trusted publishing (OIDC) — no NODE_AUTH_TOKEN; uses the workflow-level
+      # `id-token: write` permission.
+      - name: Publish to npm
+        working-directory: npm
+        run: npm publish --provenance --access public
 
       - name: Upload to GitHub Release
         run: gh release upload ${{ needs.release-please.outputs.tag_name }} ./nupkg/*.nupkg

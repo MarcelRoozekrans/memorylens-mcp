@@ -9,6 +9,7 @@
 <p align="center">
   <a href="https://www.nuget.org/packages/MemoryLens.Mcp"><img src="https://img.shields.io/nuget/v/MemoryLens.Mcp?style=flat-square&logo=nuget&color=blue" alt="NuGet"></a>
   <a href="https://www.nuget.org/packages/MemoryLens.Mcp"><img src="https://img.shields.io/nuget/dt/MemoryLens.Mcp?style=flat-square&color=green" alt="NuGet Downloads"></a>
+  <a href="https://www.npmjs.com/package/memorylens-mcp"><img src="https://img.shields.io/npm/v/memorylens-mcp?style=flat-square&logo=npm&color=cb3837" alt="npm"></a>
   <a href="https://github.com/MarcelRoozekrans/memorylens-mcp/actions"><img src="https://img.shields.io/github/actions/workflow/status/MarcelRoozekrans/memorylens-mcp/ci.yml?branch=main&style=flat-square&logo=github" alt="Build Status"></a>
   <a href="https://github.com/MarcelRoozekrans/memorylens-mcp/blob/main/LICENSE"><img src="https://img.shields.io/github/license/MarcelRoozekrans/memorylens-mcp?style=flat-square" alt="License"></a>
 </p>
@@ -30,6 +31,24 @@
 A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/marcelroozekrans-memorylens-mcp).
 
 ## Quick Start
+
+### npx (any MCP client)
+
+```json
+{
+  "mcpServers": {
+    "memorylens": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "memorylens-mcp"]
+    }
+  }
+}
+```
+
+The npm package ships no server code — it is a launcher that installs the `MemoryLens.Mcp` .NET
+global tool at a matching version and execs it, so the **.NET 10 SDK must be on `PATH`**.
+Subsequent starts skip the install entirely and work offline.
 
 ### VS Code / Visual Studio (via dnx)
 
