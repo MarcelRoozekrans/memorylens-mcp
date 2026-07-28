@@ -78,6 +78,18 @@ claude install gh:MarcelRoozekrans/memorylens-mcp
 dotnet tool install -g MemoryLens.Mcp
 ```
 
+### Docker
+
+```bash
+docker build -t memorylens-mcp .
+docker run -i --rm --pid=host --cap-add=SYS_PTRACE \
+  -v "$PWD:/workspace" -v memorylens-tools:/root/.memorylens memorylens-mcp
+```
+
+Profiling from a container needs `ptrace` and the host PID namespace, and on
+Docker Desktop that namespace is the Linux VM rather than your desktop — see
+[docs/docker.md](docs/docker.md) before choosing this route.
+
 ## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) or later
