@@ -219,3 +219,9 @@ ASALocalRun/
 
 # macOS
 .DS_Store
+
+# npm launcher package. The [Bb]in/ rule above is meant for .NET build output; npm/bin
+# holds the launcher script and must be tracked. Git cannot re-include a file whose
+# parent directory is excluded, so the directory itself has to be negated first.
+!npm/bin/
+npm/*.tgz

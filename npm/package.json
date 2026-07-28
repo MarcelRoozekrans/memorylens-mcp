@@ -1,0 +1,37 @@
+{
+  "name": "memorylens-mcp",
+  "version": "1.5.1",
+  "description": "MCP server for .NET memory profiling with AI-actionable code fix suggestions — wraps JetBrains dotMemory with a heuristic-based rule engine.",
+  "bin": {
+    "memorylens-mcp": "./bin/memorylens-mcp.js"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "modelcontextprotocol",
+    "memory",
+    "profiling",
+    "dotmemory",
+    "diagnostics",
+    "dotnet",
+    "memory-leak"
+  ],
+  "license": "MIT",
+  "author": "Marcel Roozekrans",
+  "homepage": "https://github.com/MarcelRoozekrans/memorylens-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MarcelRoozekrans/memorylens-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MarcelRoozekrans/memorylens-mcp/issues"
+  },
+  "mcpName": "io.github.MarcelRoozekrans/memorylens-mcp",
+  "engines": {
+    "node": ">=18"
+  }
+}
