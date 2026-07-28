@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.6.0...v1.7.0) (2026-07-28)
+
+
+### Features
+
+* Docker support and glama.json for Glama indexing ([#117](https://github.com/MarcelRoozekrans/memorylens-mcp/issues/117)) ([8d79bd8](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/8d79bd8937b4d30574488db32c751bf2b0a04a5d))
+
+
+### Bug Fixes
+
+* make list_processes work, and restore execute bits on the extracted profiler ([#118](https://github.com/MarcelRoozekrans/memorylens-mcp/issues/118)) ([dccd733](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/dccd733901a379fcb21e4fca16c0f5b677d31cbd))
+
 ## [1.6.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.5.2...v1.6.0) (2026-07-28)
 
 
