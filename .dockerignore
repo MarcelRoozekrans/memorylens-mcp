@@ -1,0 +1,20 @@
+# Everything the image does not need. Keeping bin/ and obj/ out matters most:
+# host build output leaking into the build context breaks the container restore.
+**/bin/
+**/obj/
+.git/
+.github/
+.vs/
+.vscode/
+.claude/
+TestResults/
+artifacts/
+
+tests/
+docs/
+skills/
+npm/
+samples/
+
+*.md
+!README.md
