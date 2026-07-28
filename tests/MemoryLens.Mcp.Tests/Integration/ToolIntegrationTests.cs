@@ -32,16 +32,12 @@ public class ToolIntegrationTests
     [Fact]
     public async Task ListProcesses_FiltersExcludedProcesses()
     {
-        var processOutput = """
-            1234 MyApp.Web
-            5678 devenv
-            9012 dotnet-dotmemory
-            3456 MyApp.Worker
-            """;
-
-        var runner = new FakeProcessRunner(exitCode: 0, output: processOutput);
-        var filter = new ProcessFilter();
-        var tool = new ListProcessesTool(runner, filter);
+        var lister = new FakeDotNetProcessLister(
+            new DotNetProcess(1234, "MyApp.Web", ""),
+            new DotNetProcess(5678, "devenv", ""),
+            new DotNetProcess(9012, "dotnet-dotmemory", ""),
+            new DotNetProcess(3456, "MyApp.Worker", ""));
+        var tool = new ListProcessesTool(lister, new ProcessFilter());
 
         var json = await tool.list_processes(ct: TestContext.Current.CancellationToken);
         var processes = JsonDocument.Parse(json).RootElement;
@@ -59,20 +55,67 @@ public class ToolIntegrationTests
     [Fact]
     public async Task ListProcesses_WithFilter_NarrowsResults()
     {
-        var processOutput = """
-            1234 MyApp.Web
-            3456 MyApp.Worker
-            7890 OtherApp.Service
-            """;
-
-        var runner = new FakeProcessRunner(exitCode: 0, output: processOutput);
-        var filter = new ProcessFilter();
-        var tool = new ListProcessesTool(runner, filter);
+        var lister = new FakeDotNetProcessLister(
+            new DotNetProcess(1234, "MyApp.Web", ""),
+            new DotNetProcess(3456, "MyApp.Worker", ""),
+            new DotNetProcess(7890, "OtherApp.Service", ""));
+        var tool = new ListProcessesTool(lister, new ProcessFilter());
 
         var json = await tool.list_processes(filter: "MyApp", ct: TestContext.Current.CancellationToken);
         var processes = JsonDocument.Parse(json).RootElement;
 
         Assert.Equal(2, processes.GetArrayLength());
+    }
+
+    /// <summary>
+    /// Guards the defect this replaced: the tool shelled out to
+    /// `dotnet dotmemory list-processes`. dotMemory Console has no process-listing
+    /// command at all, so the tool could never work — and it also made an unrelated
+    /// profiler install a prerequisite for merely listing processes.
+    /// </summary>
+    [Fact]
+    public async Task ListProcesses_NeedsNoProfilerInstalled()
+    {
+        var lister = new FakeDotNetProcessLister(new DotNetProcess(1234, "MyApp.Web", ""));
+
+        // No IProcessRunner and no DotMemoryToolManager: the tool cannot reach a CLI
+        // even if one were installed.
+        var tool = new ListProcessesTool(lister, new ProcessFilter());
+
+        var json = await tool.list_processes(ct: TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, JsonDocument.Parse(json).RootElement.GetArrayLength());
+    }
+
+    [Fact]
+    public async Task ListProcesses_NoDotNetProcesses_ReturnsEmptyArray()
+    {
+        var tool = new ListProcessesTool(new FakeDotNetProcessLister(), new ProcessFilter());
+
+        var json = await tool.list_processes(ct: TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, JsonDocument.Parse(json).RootElement.GetArrayLength());
+    }
+
+    /// <summary>
+    /// ProcessFilter excludes the server by the name "MemoryLens.Mcp", which does not
+    /// match when it runs as `dotnet MemoryLens.Mcp.dll` — the process name is then
+    /// just "dotnet". Excluding by pid is what actually holds.
+    /// </summary>
+    [Fact]
+    public async Task ListProcesses_ExcludesItself_EvenWhenRunningAsPlainDotnet()
+    {
+        var lister = new FakeDotNetProcessLister(
+            new DotNetProcess(Environment.ProcessId, "dotnet", "/usr/share/dotnet/dotnet"),
+            new DotNetProcess(4321, "MyApp.Web", "/app/MyApp.Web"));
+        var tool = new ListProcessesTool(lister, new ProcessFilter());
+
+        var json = await tool.list_processes(ct: TestContext.Current.CancellationToken);
+        var processes = JsonDocument.Parse(json).RootElement;
+
+        var pids = processes.EnumerateArray().Select(p => p.GetProperty("Pid").GetInt32()).ToList();
+        Assert.DoesNotContain(Environment.ProcessId, pids);
+        Assert.Contains(4321, pids);
     }
 
     [Fact]

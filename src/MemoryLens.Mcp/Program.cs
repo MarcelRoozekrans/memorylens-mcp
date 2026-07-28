@@ -20,6 +20,7 @@ builder.Services.AddSingleton<DotMemoryToolManager>(sp => new DotMemoryToolManag
     sp.GetRequiredService<IProcessRunner>(),
     sp.GetRequiredService<IDotMemoryAutoInstaller>()));
 builder.Services.AddSingleton<ProcessFilter>();
+builder.Services.AddSingleton<IDotNetProcessLister>(_ => new DiagnosticPortProcessLister());
 builder.Services.AddSingleton<SnapshotManager>();
 builder.Services.AddSingleton<MemoryLensConfig>(sp =>
     ConfigLoader.LoadFromPath(Path.Combine(Directory.GetCurrentDirectory(), ".memorylens.json")));

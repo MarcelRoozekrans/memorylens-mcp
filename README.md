@@ -136,7 +136,7 @@ If auto-download is unavailable, MemoryLens MCP falls back through these discove
 | Tool | Description |
 |------|-------------|
 | `ensure_dotmemory` | Downloads and verifies the JetBrains dotMemory CLI tool is available |
-| `list_processes` | Lists running .NET processes available for profiling |
+| `list_processes` | Lists running .NET processes available for profiling. Discovers them from their diagnostic IPC endpoints, so it works before `ensure_dotmemory` |
 | `snapshot` | Captures a single memory snapshot of a target process |
 | `compare_snapshots` | Captures two snapshots with configurable delay and compares them |
 | `analyze` | Runs the rule engine against a captured snapshot and returns findings |

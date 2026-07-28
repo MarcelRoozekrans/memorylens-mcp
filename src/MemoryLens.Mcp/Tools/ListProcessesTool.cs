@@ -1,6 +1,4 @@
-#pragma warning disable MA0048 // File name must match type name - intentional companion types
 using System.ComponentModel;
-using System.Globalization;
 using System.Text.Json;
 using MemoryLens.Mcp.Profiler;
 using ModelContextProtocol.Server;
@@ -8,43 +6,31 @@ using ModelContextProtocol.Server;
 namespace MemoryLens.Mcp.Tools;
 
 [McpServerToolType]
-public class ListProcessesTool(IProcessRunner processRunner, ProcessFilter processFilter)
+public class ListProcessesTool(IDotNetProcessLister processLister, ProcessFilter processFilter)
 {
     [McpServerTool, Description(
-        "Lists running .NET processes suitable for memory profiling. " +
+        "Lists running .NET processes suitable for memory profiling, discovered from " +
+        "their diagnostic IPC endpoints. Does not require dotMemory to be installed. " +
         "Excludes IDE, tooling, and MCP server processes to prevent interference.")]
-    public async Task<string> list_processes(
+    public Task<string> list_processes(
         [Description("Optional filter to match process name")] string? filter = null,
         CancellationToken ct = default)
     {
-        var result = await processRunner.RunAsync(
-            "dotnet", "dotmemory list-processes", ct).ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
 
-        if (result.ExitCode != 0)
-            return $"Failed to list processes: {result.Error}";
-
-        var processes = ParseProcessList(result.Output)
+        var processes = processLister.ListProcesses()
+            // Exclude ourselves by pid, not by name. ProcessFilter matches "MemoryLens.Mcp",
+            // but launched as `dotnet MemoryLens.Mcp.dll` the process name is just
+            // "dotnet" and the module path carries no assembly name, so the server would
+            // otherwise offer itself up for profiling.
+            .Where(p => p.Pid != Environment.ProcessId)
             .Where(p => !processFilter.IsExcluded(p.Name, p.CommandLine))
             .Where(p => filter == null ||
                         p.Name.Contains(filter, StringComparison.OrdinalIgnoreCase));
 
-        return JsonSerializer.Serialize(processes, new JsonSerializerOptions
+        return Task.FromResult(JsonSerializer.Serialize(processes, new JsonSerializerOptions
         {
             WriteIndented = true
-        });
-    }
-
-    private static IEnumerable<DotNetProcess> ParseProcessList(string output)
-    {
-        foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-        {
-            var parts = line.Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 2 && int.TryParse(parts[0], CultureInfo.InvariantCulture, out var pid))
-            {
-                yield return new DotNetProcess(pid, parts[1].Trim(), "");
-            }
-        }
+        }));
     }
 }
-
-public record DotNetProcess(int Pid, string Name, string CommandLine);

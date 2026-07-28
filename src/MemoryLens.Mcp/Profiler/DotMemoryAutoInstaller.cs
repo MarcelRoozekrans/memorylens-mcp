@@ -77,7 +77,18 @@ public class DotMemoryAutoInstaller(HttpClient httpClient, string? cacheRoot = n
         var version = (await File.ReadAllTextAsync(currentFile, ct).ConfigureAwait(false)).Trim();
         var versionDir = Path.Combine(_cacheRoot, version);
         var exePath = FindExecutable(versionDir);
-        return exePath is not null && File.Exists(exePath) ? exePath : null;
+        if (exePath is null || !File.Exists(exePath))
+            return null;
+
+        // Re-apply the execute bits on a cache hit as well. A cache extracted before
+        // MakeToolsExecutable walked the whole tree has an executable entry point but
+        // a non-executable runtime-dotnet.sh, and resolution would otherwise hand back
+        // a path that fails with "Permission denied" forever.
+        try { MakeToolsExecutable(versionDir); }
+        catch (IOException) { /* best effort — a read-only cache still resolves */ }
+        catch (UnauthorizedAccessException) { /* ditto */ }
+
+        return exePath;
     }
 
     private static string? FindExecutable(string versionDir)
@@ -147,7 +158,7 @@ public class DotMemoryAutoInstaller(HttpClient httpClient, string? cacheRoot = n
             return null;
         }
 
-        try { await MakeExecutableAsync(exePath).ConfigureAwait(false); }
+        try { MakeToolsExecutable(versionDir); }
         catch (OperationCanceledException) { throw; }
         catch
         {
@@ -206,16 +217,74 @@ public class DotMemoryAutoInstaller(HttpClient httpClient, string? cacheRoot = n
         }
     }
 
-    private static Task MakeExecutableAsync(string path)
+    /// <summary>
+    /// Restores the execute bit across the extracted package.
+    /// <para>
+    /// ZipFile.ExtractToDirectory discards Unix permission bits, so everything in a
+    /// .nupkg arrives as 0644. Chmodding only the entry point is not enough: the
+    /// dotMemory launcher execs runtime-dotnet.sh, which in turn execs a native host,
+    /// and the failure surfaces as "Permission denied" on that second hop.
+    /// </para>
+    /// </summary>
+    internal static void MakeToolsExecutable(string versionDir)
     {
         if (OperatingSystem.IsWindows())
-            return Task.CompletedTask;
+            return;
 
-        File.SetUnixFileMode(path,
-            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
-            UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
-            UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        foreach (var path in Directory.EnumerateFiles(versionDir, "*", SearchOption.AllDirectories))
+        {
+            // Cheap first: skip anything already executable so the cache-hit path does
+            // not re-stat and re-chmod the whole package on every resolve.
+            if (File.GetUnixFileMode(path).HasFlag(UnixFileMode.UserExecute))
+                continue;
 
-        return Task.CompletedTask;
+            if (!NeedsExecuteBit(path))
+                continue;
+
+            File.SetUnixFileMode(path,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        }
+    }
+
+    /// <summary>
+    /// Whether a file is something the OS must be able to exec, decided by its leading
+    /// bytes rather than its name.
+    /// <para>
+    /// Naming is not a usable signal here: JetBrains ships native helpers with
+    /// dotted names (JetBrains.Profiler.PdbServer), so Path.GetExtension reports
+    /// ".PdbServer" and an "extensionless means native" rule silently misses them.
+    /// Managed assemblies start with "MZ" and are launched through the host, so they
+    /// are excluded for free.
+    /// </para>
+    /// </summary>
+    internal static bool NeedsExecuteBit(string path)
+    {
+        Span<byte> header = stackalloc byte[4];
+
+        int read;
+        try
+        {
+            using var stream = File.OpenRead(path);
+            read = stream.ReadAtLeast(header, header.Length, throwOnEndOfStream: false);
+        }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+
+        // Shebang: "#!"
+        if (read >= 2 && header[0] == 0x23 && header[1] == 0x21)
+            return true;
+
+        if (read < 4)
+            return false;
+
+        // ELF: 0x7F 'E' 'L' 'F'
+        if (header[0] == 0x7F && header[1] == 0x45 && header[2] == 0x4C && header[3] == 0x46)
+            return true;
+
+        // Mach-O, 32/64-bit either endianness, plus universal binaries.
+        var magic = (uint)(header[0] << 24 | header[1] << 16 | header[2] << 8 | header[3]);
+        return magic is 0xFEEDFACE or 0xFEEDFACF or 0xCEFAEDFE or 0xCFFAEDFE or 0xCAFEBABE;
     }
 }
