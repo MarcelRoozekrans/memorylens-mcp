@@ -20,6 +20,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -47,9 +48,19 @@ jobs:
 
   build:
     needs: test
+    # Branch protection requires exactly one check named `build`. A *skipped*
+    # required check counts as satisfied, so `needs: test` alone would make a PR
+    # with a red test matrix mergeable. Always run, then fail loudly instead.
+    if: always()
     runs-on: ubuntu-latest
 
     steps:
+      - name: Fail if the test matrix did not pass
+        if: needs.test.result != 'success'
+        run: |
+          echo "test matrix result: ${{ needs.test.result }}"
+          exit 1
+
       - name: Checkout
         uses: actions/checkout@v7
         with:

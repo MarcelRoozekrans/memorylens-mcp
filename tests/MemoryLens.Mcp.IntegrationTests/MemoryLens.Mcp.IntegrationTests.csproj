@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <TestingPlatformCommandLineArguments>--minimum-expected-tests 11</TestingPlatformCommandLineArguments>
+    <TestingPlatformCommandLineArguments>--minimum-expected-tests 13</TestingPlatformCommandLineArguments>
   </PropertyGroup>
 
   <ItemGroup>

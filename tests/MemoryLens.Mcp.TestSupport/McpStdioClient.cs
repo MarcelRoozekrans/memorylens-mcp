@@ -14,34 +14,49 @@ public sealed class McpStdioClient : IAsyncDisposable
 {
     private readonly Process _process;
     private readonly TimeSpan _timeout;
-    private readonly TempDir _workingDirectory;
+    /// <summary>Only set when this client created the directory, and so owns disposing it.</summary>
+    private readonly TempDir? _ownedWorkingDirectory;
     private readonly StringBuilder _stderr = new();
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private int _nextId;
 
-    private McpStdioClient(Process process, TimeSpan timeout, TempDir workingDirectory)
+    private McpStdioClient(Process process, TimeSpan timeout, TempDir? ownedWorkingDirectory)
     {
         _process = process;
         _timeout = timeout;
-        _workingDirectory = workingDirectory;
+        _ownedWorkingDirectory = ownedWorkingDirectory;
     }
 
-    /// <summary>Launches the server DLL copied next to the test assembly.</summary>
-    public static McpStdioClient StartServer(TimeSpan? timeout = null)
+    /// <summary>
+    /// Launches the server DLL copied next to the test assembly.
+    /// <paramref name="workingDirectory"/> lets a caller point the server at a directory
+    /// it has seeded (e.g. with a .memorylens.json) to exercise Program.cs's
+    /// Directory.GetCurrentDirectory() config lookup; when null a private empty one is used.
+    /// </summary>
+    public static McpStdioClient StartServer(TimeSpan? timeout = null, string? workingDirectory = null)
     {
         var dll = Path.Combine(AppContext.BaseDirectory, "MemoryLens.Mcp.dll");
         if (!File.Exists(dll))
             throw new FileNotFoundException(
                 $"Server not found at {dll}. The test project needs a ProjectReference to MemoryLens.Mcp.", dll);
 
-        return Start("dotnet", $"\"{dll}\"", timeout);
+        // Prefer the host the current runtime was launched with over whatever "dotnet"
+        // resolves to on PATH.
+        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
+        if (string.IsNullOrEmpty(host))
+            host = "dotnet";
+
+        return Start(host, $"\"{dll}\"", timeout, workingDirectory);
     }
 
-    public static McpStdioClient Start(string fileName, string arguments, TimeSpan? timeout = null)
+    public static McpStdioClient Start(
+        string fileName, string arguments, TimeSpan? timeout = null, string? workingDirectory = null)
     {
-        // Every spawned server gets its own empty working directory so a stray
-        // .memorylens.json in the inherited CWD can never silently change its behaviour.
-        var workingDirectory = new TempDir();
+        // Absent a caller-supplied directory, every spawned server gets its own empty one
+        // so a stray .memorylens.json in the inherited CWD can never silently change its
+        // behaviour. A supplied directory is the caller's to create and clean up.
+        var ownedWorkingDirectory = workingDirectory is null ? new TempDir() : null;
+        var effectiveWorkingDirectory = workingDirectory ?? ownedWorkingDirectory!.Path;
 
         var psi = new ProcessStartInfo(fileName, arguments)
         {
@@ -51,7 +66,7 @@ public sealed class McpStdioClient : IAsyncDisposable
             UseShellExecute = false,
             StandardOutputEncoding = new UTF8Encoding(false),
             StandardErrorEncoding = new UTF8Encoding(false),
-            WorkingDirectory = workingDirectory.Path,
+            WorkingDirectory = effectiveWorkingDirectory,
         };
 
         Process process;
@@ -62,11 +77,11 @@ public sealed class McpStdioClient : IAsyncDisposable
         }
         catch
         {
-            workingDirectory.Dispose();
+            ownedWorkingDirectory?.Dispose();
             throw;
         }
 
-        var client = new McpStdioClient(process, timeout ?? TimeSpan.FromSeconds(60), workingDirectory);
+        var client = new McpStdioClient(process, timeout ?? TimeSpan.FromSeconds(60), ownedWorkingDirectory);
 
         // The server logs to stderr; drain it so a full pipe can never deadlock the child.
         process.ErrorDataReceived += (_, e) =>
@@ -214,7 +229,7 @@ public sealed class McpStdioClient : IAsyncDisposable
         {
             _writeLock.Dispose();
             _process.Dispose();
-            _workingDirectory.Dispose();
+            _ownedWorkingDirectory?.Dispose();
         }
     }
 }

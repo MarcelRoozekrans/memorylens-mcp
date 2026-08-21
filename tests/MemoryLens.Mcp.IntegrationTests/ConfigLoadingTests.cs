@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MemoryLens.Mcp.Config;
 using MemoryLens.Mcp.TestSupport;
 using Xunit;
@@ -59,5 +60,45 @@ public class ConfigLoadingTests
         Assert.Empty(defaults.Rules);
         Assert.Empty(defaults.Ignore);
         Assert.True(new RuleOverride().Enabled);
+    }
+
+    /// <summary>
+    /// The seam the three tests above cannot reach: Program.cs resolves the config as
+    /// Path.Combine(Directory.GetCurrentDirectory(), ".memorylens.json"). Calling
+    /// LoadFromPath with an explicit path proves the parser works but says nothing about
+    /// whether a real server, started in a real directory, ever finds that file. This
+    /// starts one and observes the effect through the wire: a disabled ML001 must vanish
+    /// from get_rules, because AnalysisEngine.GetActiveRules filters on RuleOverride.Enabled.
+    /// </summary>
+    [Fact(Timeout = 60_000)]
+    public async Task ServerReadsMemorylensJsonFromItsWorkingDirectory()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        using var dir = new TempDir();
+        await File.WriteAllTextAsync(
+            Path.Combine(dir.Path, ".memorylens.json"),
+            """{"rules":{"ML001":{"enabled":false}}}""",
+            ct);
+
+        await using var client = McpStdioClient.StartServer(
+            TimeSpan.FromSeconds(45), workingDirectory: dir.Path);
+        await client.InitializeAsync(ct);
+
+        var result = await client.CallToolAsync("get_rules", new { }, ct);
+        var text = result.GetProperty("content")[0].GetProperty("text").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(text));
+
+        using var payload = JsonDocument.Parse(text!);
+        var ids = payload.RootElement.GetProperty("rules")
+            .EnumerateArray()
+            .Select(r => r.GetProperty("Id").GetString()!)
+            .ToList();
+
+        // The only way ML001 can be missing is if the server read the file we wrote.
+        Assert.DoesNotContain("ML001", ids, StringComparer.Ordinal);
+
+        // ...and the rest must still be there, so this cannot pass on an empty payload.
+        Assert.Contains("ML002", ids, StringComparer.Ordinal);
     }
 }

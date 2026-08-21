@@ -23,11 +23,26 @@ public class McpProtocolTests
         "snapshot",
     ];
 
-    [Fact(Timeout = 30_000)]
+    /// <summary>Every rule the server is contracted to expose via get_rules.</summary>
+    private static readonly string[] ExpectedRuleIds =
+    [
+        "ML001",
+        "ML002",
+        "ML003",
+        "ML004",
+        "ML005",
+        "ML006",
+        "ML007",
+        "ML008",
+        "ML009",
+        "ML010",
+    ];
+
+    [Fact(Timeout = 60_000)]
     public async Task Server_StartsAndCompletesTheHandshake()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var client = McpStdioClient.StartServer();
+        await using var client = McpStdioClient.StartServer(TimeSpan.FromSeconds(45));
 
         var result = await client.InitializeAsync(ct);
 
@@ -36,11 +51,11 @@ public class McpProtocolTests
         Assert.True(caps.TryGetProperty("tools", out _));
     }
 
-    [Fact(Timeout = 30_000)]
+    [Fact(Timeout = 60_000)]
     public async Task ToolsList_ExposesExactlyTheExpectedTools()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var client = McpStdioClient.StartServer();
+        await using var client = McpStdioClient.StartServer(TimeSpan.FromSeconds(45));
         await client.InitializeAsync(ct);
 
         var names = await client.ListToolNamesAsync(ct);
@@ -50,11 +65,11 @@ public class McpProtocolTests
         Assert.Equal(ExpectedTools, names);
     }
 
-    [Fact(Timeout = 30_000)]
+    [Fact(Timeout = 60_000)]
     public async Task GetRules_RoundTripsOverTheWire()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var client = McpStdioClient.StartServer();
+        await using var client = McpStdioClient.StartServer(TimeSpan.FromSeconds(45));
         await client.InitializeAsync(ct);
 
         var result = await client.CallToolAsync("get_rules", new { }, ct);
@@ -66,14 +81,14 @@ public class McpProtocolTests
         using var payload = JsonDocument.Parse(text!);
         var ids = payload.RootElement.GetProperty("rules")
             .EnumerateArray()
-            .Select(r => r.GetProperty("Id").GetString())
+            .Select(r => r.GetProperty("Id").GetString()!)
+            .OrderBy(id => id, StringComparer.Ordinal)
             .ToList();
 
-        Assert.Contains("ML001", ids);
-
-        // Cross-check against the payload's own count rather than a hardcoded 10:
-        // proves the payload survived the wire intact without duplicating the rule
-        // count assertion that AnalysisEngineTests.cs already owns.
-        Assert.Equal(payload.RootElement.GetProperty("count").GetInt32(), ids.Count);
+        // Exact equality against a hardcoded set, mirroring ExpectedTools above.
+        // Cross-checking against the payload's own "count" would be vacuous:
+        // GetRulesTool serialises count from the very list it serialises, so that
+        // assertion holds for any payload that parses at all.
+        Assert.Equal(ExpectedRuleIds, ids, StringComparer.Ordinal);
     }
 }
