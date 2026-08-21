@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -47,3 +50,43 @@ jobs:
       - name: Push to NuGet (pre-release)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  alert:
+    needs: [build]
+    if: always() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      SHA: ${{ github.sha }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Open or update the red-main issue
+        if: needs.build.result == 'failure'
+        run: |
+          set -euo pipefail
+          existing=$(gh issue list --label ci-red --state open --json number --jq '.[0].number // empty')
+          body=$(printf 'CI failed on `main` at %s.\n\nRun: %s\n' "$SHA" "$RUN_URL")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+            echo "Commented on existing issue #$existing"
+          else
+            gh issue create --title "CI is red on main" --label ci-red --body "$body"
+            echo "Opened a new ci-red issue"
+          fi
+
+      - name: Close the red-main issue on recovery
+        if: needs.build.result == 'success'
+        run: |
+          set -euo pipefail
+          existing=$(gh issue list --label ci-red --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$(printf 'Recovered on %s.\n\nRun: %s\n' "$SHA" "$RUN_URL")"
+            gh issue close "$existing"
+            echo "Closed issue #$existing"
+          else
+            echo "No open ci-red issue; nothing to close"
+          fi
