@@ -65,7 +65,7 @@ jobs:
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - name: Open or update the red-main issue
-        if: needs.build.result == 'failure'
+        if: needs.build.result != 'success'
         run: |
           set -euo pipefail
           existing=$(gh issue list --label ci-red --state open --json number --jq '.[0].number // empty')

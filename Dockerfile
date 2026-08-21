@@ -21,6 +21,12 @@ WORKDIR /src
 
 # Restore against the project file alone so the (slow) restore layer survives
 # source-only edits. Directory.Build.props carries the shared analyzer set.
+#
+# global.json is deliberately NOT copied in: it pins 10.0.400 with
+# rollForward: latestPatch, and the floating sdk:10.0 tag above will
+# eventually roll forward to a 10.0.5xx feature band. Copying the pin in
+# would then hard-break the build ("compatible SDK version not found")
+# instead of just picking up the newer SDK, as it does today.
 COPY Directory.Build.props ./
 COPY src/MemoryLens.Mcp/MemoryLens.Mcp.csproj src/MemoryLens.Mcp/
 RUN dotnet restore src/MemoryLens.Mcp/MemoryLens.Mcp.csproj

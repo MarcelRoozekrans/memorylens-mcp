@@ -92,8 +92,13 @@ Docker Desktop that namespace is the Linux VM rather than your desktop — see
 
 ## Prerequisites
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) or later
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), 10.0.4xx feature band (pinned in `global.json`)
 - JetBrains dotMemory CLI (see below for installation options)
+
+Running a filtered subset of the tests, e.g. `dotnet test --filter <name>`, will exit with code 9
+and print `error: 1, failed: 0`. That's the test project's discovery-collapse guard
+(`--minimum-expected-tests 130`) firing because the filter left fewer tests than expected — it is
+not a test failure, and a full `dotnet test` run is unaffected.
 
 ## dotMemory CLI Installation
 
