@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.2](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.7.1...v1.7.2) (2026-08-21)
+
+
+### Bug Fixes
+
+* **ci:** opt in to the MTP runner so dotnet test works on .NET 10 SDK ([#150](https://github.com/MarcelRoozekrans/memorylens-mcp/issues/150)) ([ae0e957](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/ae0e957c219268b52492bef149f4fa942c432174))
+
 ## [1.7.1](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.7.0...v1.7.1) (2026-07-28)
 
 
