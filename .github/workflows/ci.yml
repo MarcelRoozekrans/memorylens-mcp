@@ -9,8 +9,44 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: ./global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Test
+        run: dotnet test --no-build -c Release
+
   build:
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
@@ -40,9 +76,6 @@ jobs:
       - name: Build
         run: dotnet build --no-restore -c Release -p:Version=${{ steps.gitversion.outputs.version }}
 
-      - name: Test
-        run: dotnet test --no-build -c Release --verbosity normal
-
       - name: Pack
         run: |
           dotnet pack src/MemoryLens.Mcp/MemoryLens.Mcp.csproj --no-build -c Release -p:PackageVersion=${{ steps.gitversion.outputs.version }} -o ./artifacts
@@ -52,7 +85,7 @@ jobs:
         run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
   alert:
-    needs: [build]
+    needs: [test, build]
     if: always() && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -65,7 +98,7 @@ jobs:
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - name: Open or update the red-main issue
-        if: needs.build.result != 'success'
+        if: needs.test.result != 'success' || needs.build.result != 'success'
         run: |
           set -euo pipefail
           existing=$(gh issue list --label ci-red --state open --json number --jq '.[0].number // empty')
@@ -79,7 +112,7 @@ jobs:
           fi
 
       - name: Close the red-main issue on recovery
-        if: needs.build.result == 'success'
+        if: needs.test.result == 'success' && needs.build.result == 'success'
         run: |
           set -euo pipefail
           existing=$(gh issue list --label ci-red --state open --json number --jq '.[0].number // empty')
