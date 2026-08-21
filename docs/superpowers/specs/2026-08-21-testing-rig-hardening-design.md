@@ -334,6 +334,41 @@ guard lands.
 **Phase 3 — E2E tier.** `LeakyApp`, `EndToEndTests`, `e2e.yml`. Gated on the
 licence question below.
 
+### Phase 2 prerequisites discovered during Phase 1
+
+Phase 1 shipped as `a89a234..f0776d9`. Executing it surfaced four traps that
+Phase 2 must handle. They are recorded here rather than in an execution ledger
+because that ledger is scratch and will not survive.
+
+1. **The alert's `needs` list is load-bearing.** Phase 1's alert job is
+   `needs: [build]` and its open-issue step fires on `needs.build.result != 'success'`
+   — deliberately `!= 'success'` rather than `== 'failure'`, because a fail-fast
+   matrix *cancels* sibling legs and `cancelled` would otherwise alert nobody.
+   When Phase 2 introduces the `test` matrix job, it must add `test` to `needs`
+   **and** to the result checks. Adding it to `needs` alone reintroduces the gap.
+
+2. **The min-test floor must move with the tests.** The floor of `130` is
+   calibrated against 137 in `MemoryLens.Mcp.Tests`. If the 22 tests under
+   `tests/MemoryLens.Mcp.Tests/Integration/` are relocated into the real
+   integration tier — a natural move, since this spec calls that directory
+   misleadingly named — the count drops to roughly 115 and the floor fails
+   as what looks like a false alarm. Lower the floor in the same commit that
+   moves the tests.
+
+3. **Windows self-skips must not break the new project's floor.** Section 1
+   says the exec-bit tests self-skip on Windows. If they use xunit's `Skip =`,
+   they may not count toward `--minimum-expected-tests`, so a floor calibrated
+   on Linux fails the Windows leg. The existing suite avoids this by branching
+   *inside* the test body (see `DiagnosticPortProcessListerTests.cs` and
+   `DotMemoryAutoInstallerTests.cs`), which keeps them counted as passed.
+   Follow that pattern, or make the new project's floor OS-conditional.
+
+4. **The Docker build is outside the SDK pin, deliberately.** `Dockerfile` builds
+   on the floating `mcr.microsoft.com/dotnet/sdk:10.0` tag and does **not** copy
+   `global.json`. Copying it would hard-break the image as soon as that tag rolls
+   to a `10.0.5xx` band, since the pin is `latestPatch`. A comment in the
+   Dockerfile records this. Phase 3's Docker E2E test must not "fix" it.
+
 ## Risks and open questions
 
 **dotMemory licence for CI use — resolve before Phase 3.** The nightly tier
