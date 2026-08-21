@@ -23,7 +23,7 @@ public class McpProtocolTests
         "snapshot",
     ];
 
-    [Fact]
+    [Fact(Timeout = 30_000)]
     public async Task Server_StartsAndCompletesTheHandshake()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -36,7 +36,7 @@ public class McpProtocolTests
         Assert.True(caps.TryGetProperty("tools", out _));
     }
 
-    [Fact]
+    [Fact(Timeout = 30_000)]
     public async Task ToolsList_ExposesExactlyTheExpectedTools()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -50,7 +50,7 @@ public class McpProtocolTests
         Assert.Equal(ExpectedTools, names);
     }
 
-    [Fact]
+    [Fact(Timeout = 30_000)]
     public async Task GetRules_RoundTripsOverTheWire()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -70,6 +70,10 @@ public class McpProtocolTests
             .ToList();
 
         Assert.Contains("ML001", ids);
-        Assert.Equal(10, ids.Count);
+
+        // Cross-check against the payload's own count rather than a hardcoded 10:
+        // proves the payload survived the wire intact without duplicating the rule
+        // count assertion that AnalysisEngineTests.cs already owns.
+        Assert.Equal(payload.RootElement.GetProperty("count").GetInt32(), ids.Count);
     }
 }

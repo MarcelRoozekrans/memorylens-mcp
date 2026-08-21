@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
@@ -13,14 +14,16 @@ public sealed class McpStdioClient : IAsyncDisposable
 {
     private readonly Process _process;
     private readonly TimeSpan _timeout;
+    private readonly TempDir _workingDirectory;
     private readonly StringBuilder _stderr = new();
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private int _nextId;
 
-    private McpStdioClient(Process process, TimeSpan timeout)
+    private McpStdioClient(Process process, TimeSpan timeout, TempDir workingDirectory)
     {
         _process = process;
         _timeout = timeout;
+        _workingDirectory = workingDirectory;
     }
 
     /// <summary>Launches the server DLL copied next to the test assembly.</summary>
@@ -36,6 +39,10 @@ public sealed class McpStdioClient : IAsyncDisposable
 
     public static McpStdioClient Start(string fileName, string arguments, TimeSpan? timeout = null)
     {
+        // Every spawned server gets its own empty working directory so a stray
+        // .memorylens.json in the inherited CWD can never silently change its behaviour.
+        var workingDirectory = new TempDir();
+
         var psi = new ProcessStartInfo(fileName, arguments)
         {
             RedirectStandardInput = true,
@@ -44,12 +51,22 @@ public sealed class McpStdioClient : IAsyncDisposable
             UseShellExecute = false,
             StandardOutputEncoding = new UTF8Encoding(false),
             StandardErrorEncoding = new UTF8Encoding(false),
+            WorkingDirectory = workingDirectory.Path,
         };
 
-        var process = Process.Start(psi)
-            ?? throw new InvalidOperationException($"Failed to start {fileName}");
+        Process process;
+        try
+        {
+            process = Process.Start(psi)
+                ?? throw new InvalidOperationException($"Failed to start {fileName}");
+        }
+        catch
+        {
+            workingDirectory.Dispose();
+            throw;
+        }
 
-        var client = new McpStdioClient(process, timeout ?? TimeSpan.FromSeconds(60));
+        var client = new McpStdioClient(process, timeout ?? TimeSpan.FromSeconds(60), workingDirectory);
 
         // The server logs to stderr; drain it so a full pipe can never deadlock the child.
         process.ErrorDataReceived += (_, e) =>
@@ -108,27 +125,39 @@ public sealed class McpStdioClient : IAsyncDisposable
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(_timeout);
 
-        // Skip notifications and any response whose id is not ours.
-        while (true)
+        try
         {
-            var line = await _process.StandardOutput.ReadLineAsync(cts.Token).ConfigureAwait(false)
-                ?? throw new InvalidOperationException(
-                    $"Server closed stdout while awaiting '{method}'. stderr:\n{StandardError}");
+            // Skip notifications and any response whose id is not ours.
+            while (true)
+            {
+                var line = await _process.StandardOutput.ReadLineAsync(cts.Token).ConfigureAwait(false)
+                    ?? throw new InvalidOperationException(
+                        $"Server closed stdout while awaiting '{method}'. stderr:\n{StandardError}");
 
-            if (string.IsNullOrWhiteSpace(line))
-                continue;
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
 
-            using var doc = JsonDocument.Parse(line);
-            var root = doc.RootElement;
+                using var doc = JsonDocument.Parse(line);
+                var root = doc.RootElement;
 
-            if (!root.TryGetProperty("id", out var idElement) || idElement.GetInt32() != id)
-                continue;
+                if (!root.TryGetProperty("id", out var idElement)
+                    || idElement.ValueKind != JsonValueKind.Number
+                    || !idElement.TryGetInt32(out var responseId)
+                    || responseId != id)
+                {
+                    continue;
+                }
 
-            if (root.TryGetProperty("error", out var error))
-                throw new InvalidOperationException(
-                    $"'{method}' returned a JSON-RPC error: {error.GetRawText()}");
+                if (root.TryGetProperty("error", out var error))
+                    throw new InvalidOperationException(
+                        $"'{method}' returned a JSON-RPC error: {error.GetRawText()}");
 
-            return root.GetProperty("result").Clone();
+                return root.GetProperty("result").Clone();
+            }
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new TimeoutException($"'{method}' timed out after {_timeout}. stderr:\n{StandardError}");
         }
     }
 
@@ -157,17 +186,35 @@ public sealed class McpStdioClient : IAsyncDisposable
             if (!_process.HasExited)
             {
                 _process.Kill(entireProcessTree: true);
-                await _process.WaitForExitAsync().ConfigureAwait(false);
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                try
+                {
+                    await _process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Best-effort: disposal must never hang or throw.
+                }
             }
         }
         catch (InvalidOperationException)
         {
             // Already gone.
         }
+        catch (Win32Exception)
+        {
+            // Could not signal the process (e.g. already exiting); nothing more to do.
+        }
+        catch (NotSupportedException)
+        {
+            // Remote/unsupported process handle; nothing more to do.
+        }
         finally
         {
             _writeLock.Dispose();
             _process.Dispose();
+            _workingDirectory.Dispose();
         }
     }
 }
