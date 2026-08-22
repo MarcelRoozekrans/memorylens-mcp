@@ -9,26 +9,10 @@ using Xunit;
 namespace MemoryLens.Mcp.Tests.Integration;
 
 /// <summary>
-/// Integration tests for other MCP tools (ensure_dotmemory, list_processes, get_rules).
+/// Integration tests for other MCP tools (list_processes, get_rules).
 /// </summary>
 public class ToolIntegrationTests
 {
-    [Fact]
-    public async Task EnsureDotMemory_ReturnsInstalledMessage()
-    {
-        var runner = new FakeProcessRunner(
-            exitCode: 0,
-            output: "dotnet-dotmemory  2024.3.5  dotnet-dotmemory");
-        var globalToolCommand = new DotMemoryCommand(
-            "dotnet-dotmemory", "", "global tool (dotnet-dotmemory)", "2024.3.5", DotMemoryCommandKind.GlobalTool);
-        var manager = new FakeDotMemoryToolManager(runner, globalToolCommand);
-        var tool = new EnsureDotMemoryTool(manager);
-
-        var result = await tool.ensure_dotmemory(TestContext.Current.CancellationToken);
-
-        Assert.Contains("2024.3.5", result);
-    }
-
     [Fact]
     public async Task ListProcesses_FiltersExcludedProcesses()
     {

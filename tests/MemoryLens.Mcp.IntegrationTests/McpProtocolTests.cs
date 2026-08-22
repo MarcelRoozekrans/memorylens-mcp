@@ -17,7 +17,6 @@ public class McpProtocolTests
     [
         "analyze",
         "compare_snapshots",
-        "ensure_dotmemory",
         "get_rules",
         "list_processes",
         "snapshot",

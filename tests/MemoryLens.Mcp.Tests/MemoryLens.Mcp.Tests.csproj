@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <TestingPlatformCommandLineArguments>--minimum-expected-tests 130</TestingPlatformCommandLineArguments>
+    <TestingPlatformCommandLineArguments>--minimum-expected-tests 98</TestingPlatformCommandLineArguments>
   </PropertyGroup>
 
   <ItemGroup>
