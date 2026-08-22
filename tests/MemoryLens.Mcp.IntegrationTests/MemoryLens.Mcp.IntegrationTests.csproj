@@ -20,6 +20,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\MemoryLens.Mcp\MemoryLens.Mcp.csproj" />
     <ProjectReference Include="..\MemoryLens.Mcp.TestSupport\MemoryLens.Mcp.TestSupport.csproj" />
+    <ProjectReference Include="..\MemoryLens.Mcp.LeakyApp\MemoryLens.Mcp.LeakyApp.csproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType="Content"
+                      CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
