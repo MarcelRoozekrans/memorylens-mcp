@@ -11,7 +11,7 @@ public class CompareSnapshotsTool(IHeapCollector collector, ISnapshotStore store
     [McpServerTool, Description(
         "Takes two memory snapshots of a .NET process with a delay between them " +
         "for comparison. Useful for detecting memory leaks by comparing before/after state. " +
-        "Provide either a pid, processName, or command to profile.")]
+        "Provide a pid. Returns the ids and paths of both snapshots.")]
     public async Task<string> compare_snapshots(
         [Description("Process ID to snapshot")] int? pid = null,
         [Description("Process name to snapshot")] string? processName = null,

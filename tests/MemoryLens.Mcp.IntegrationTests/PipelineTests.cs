@@ -56,6 +56,19 @@ public class PipelineTests
             // finding fabricated from an empty or malformed snapshot.
             var knownIds = engine.GetActiveRules().Select(r => r.Id).ToHashSet(StringComparer.Ordinal);
             Assert.All(findings, f => Assert.Contains(f.RuleId, knownIds));
+
+            // Pin the rules that actually fire on this fixture's heap. Asserting only
+            // "some rule fired" lets a regression that silently stops detecting event
+            // handler leaks (ML001) or excessive allocations (ML006) keep passing on
+            // the back of some unrelated rule.
+            var fired = findings.Select(f => f.RuleId).ToHashSet(StringComparer.Ordinal);
+
+            Assert.True(fired.Contains("ML001"),
+                $"ML001 (event handler leak) did not fire on the fixture's heap. Fired: " +
+                $"[{string.Join(", ", fired.Order(StringComparer.Ordinal))}]");
+            Assert.True(fired.Contains("ML006"),
+                $"ML006 (excessive allocations) did not fire on the fixture's heap. Fired: " +
+                $"[{string.Join(", ", fired.Order(StringComparer.Ordinal))}]");
         }
         finally { if (!app.HasExited) app.Kill(entireProcessTree: true); }
     }

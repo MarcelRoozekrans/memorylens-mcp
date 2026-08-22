@@ -23,10 +23,13 @@ This skill requires the memorylens MCP server tools (`list_processes`, `snapshot
 
 ### Step 1: Identify target
 
-Ask the user what to profile:
-- **Running process**: Call `list_processes` and let user pick.
-- **Launch command**: User provides a `dotnet run` command or similar
-- **Both**: Attach to running OR launch — user's choice
+MemoryLens attaches to an already-running .NET process. It cannot launch one.
+
+- Call `list_processes` and let the user pick, or take a pid the user supplies.
+- If the app is not running yet, ask the user to start it first, then re-run `list_processes`.
+- `snapshot` and `compare_snapshots` both require a `pid`. Do not pass `command` — the
+  parameter is accepted for compatibility but is not implemented, and a call without a
+  pid returns an error.
 
 ### Step 2: Choose profiling mode
 
@@ -41,7 +44,11 @@ Execute `snapshot` or `compare_snapshots` with the target parameters.
 
 ### Step 4: Analyze
 
-Call `analyze` with the returned `snapshotId`. If user has a `.memorylens.json`, pass the `rulesPath`.
+Call `analyze` with the returned `snapshotId` and nothing else — the id is all it needs.
+
+Rule configuration is not a parameter. The server reads `.memorylens.json` from its own
+working directory once at startup; changing that file needs a server restart to take
+effect. Use `get_rules` to see which rules are currently active.
 
 ### Step 5: Apply fixes
 
@@ -83,5 +90,5 @@ Use rule knowledge to inform design questions and approach proposals.
 ## Red Flags
 
 1. **Profiling IDE or tooling processes** — Never. `list_processes` excludes them, but if a user asks to attach to devenv/rider/Code, refuse and explain why.
-2. **Running compare_snapshots with very long waits** — Warn if `waitAfter` > 60000ms. Long profiling sessions have overhead.
+2. **Running compare_snapshots with very long waits** — `delaySeconds` is in *seconds* and defaults to 10. Warn if the user asks for more than 60. Long profiling sessions have overhead.
 3. **Applying suggestions without user approval** — Always present and ask. Memory fixes can change behavior.

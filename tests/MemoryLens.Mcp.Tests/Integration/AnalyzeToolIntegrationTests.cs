@@ -153,10 +153,68 @@ public class AnalyzeToolIntegrationTests
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
 
+    /// <summary>
+    /// The documented workflow, verbatim: <c>snapshot</c> hands back an id, and
+    /// <c>analyze</c> is called with that id and nothing else — no snapshotPath.
+    /// Every other test in this file passes snapshotPath explicitly or builds the
+    /// context by hand, which is exactly why a bare id silently producing
+    /// <c>{"count":0}</c> on a leaking heap went unnoticed.
+    /// </summary>
     [Fact]
-    public async Task Analyze_NoPath_ReturnsEmptyFindings()
+    public async Task Analyze_WithBareSnapshotIdAndNoPath_ReturnsFindings()
     {
-        // No snapshot path provided, nothing to read
+        var root = NewRoot();
+        try
+        {
+            var (store, id) = await SaveAsync(root, LeakyAppSnapshot(), TestContext.Current.CancellationToken);
+            var engine = new AnalysisEngine(new MemoryLensConfig(), new SnapshotReader(store));
+            var tool = new AnalyzeTool(engine);
+
+            // Deliberately no snapshotPath. This is what SKILL.md Step 4 tells the
+            // agent to do and what SnapshotTool's own description promises.
+            var json = await tool.analyze(id, ct: TestContext.Current.CancellationToken);
+
+            var doc = JsonDocument.Parse(json);
+            var count = doc.RootElement.GetProperty("count").GetInt32();
+            var findings = doc.RootElement.GetProperty("findings");
+
+            Assert.True(count > 0,
+                $"analyze('{id}') with no snapshotPath reported {count} findings on a snapshot " +
+                $"that is full of leaks. A bare snapshot id must resolve. Raw: {json}");
+            Assert.True(findings.GetArrayLength() > 0);
+            Assert.Equal(count, findings.GetArrayLength());
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    /// <summary>
+    /// An id that resolves to nothing must fail loudly. Returning zero findings for a
+    /// snapshot that was never found is the "plausible but wrong" answer this pipeline
+    /// exists to eliminate.
+    /// </summary>
+    [Fact]
+    public async Task Analyze_WithUnknownSnapshotId_ThrowsRatherThanReportingNoFindings()
+    {
+        var root = NewRoot();
+        try
+        {
+            Directory.CreateDirectory(root);
+            var engine = new AnalysisEngine(new MemoryLensConfig(), new SnapshotReader(new SnapshotStore(root)));
+            var tool = new AnalyzeTool(engine);
+
+            await Assert.ThrowsAsync<FileNotFoundException>(
+                () => tool.analyze("no-such-snapshot", ct: TestContext.Current.CancellationToken));
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task Analyze_WithNoSnapshotReader_ReturnsEmptyFindings()
+    {
+        // The engine has no reader wired up at all, so there is nothing to resolve the
+        // id against and no data to enrich the context with. (This is not the "no path
+        // given" case — a bare id resolves fine when a reader is present; see
+        // Analyze_WithBareSnapshotIdAndNoPath_ReturnsFindings.)
         var engine = new AnalysisEngine(new MemoryLensConfig());
         var tool = new AnalyzeTool(engine);
 

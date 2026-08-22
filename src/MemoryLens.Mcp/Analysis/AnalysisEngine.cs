@@ -75,9 +75,21 @@ public class AnalysisEngine
             };
         }
 
-        if (context.SnapshotPath is not null)
+        // The documented workflow is "snapshot returns an id, pass that id to analyze".
+        // The id IS a resolvable locator -- SnapshotStore.LoadAsync accepts either an id
+        // or a full path -- so when no explicit path is given, fall back to the id.
+        //
+        // Fixed here rather than in AnalyzeTool on purpose: enrichment is the single
+        // place a locator turns into data, so every caller of the engine gets it, not
+        // just the one tool. Before this, SnapshotId was declared but never read by any
+        // production code, Data stayed null, every rule took its `Data is null`
+        // early-out, and the happy path answered "no memory issues found" on a leaking
+        // heap -- the exact silent-wrong-answer shape this pipeline exists to eliminate.
+        var locator = context.SnapshotPath ?? context.SnapshotId;
+
+        if (!string.IsNullOrEmpty(locator))
         {
-            var data = await _snapshots.ReadAsync(context.SnapshotPath, ct).ConfigureAwait(false);
+            var data = await _snapshots.ReadAsync(locator, ct).ConfigureAwait(false);
             return context with { Data = data };
         }
 

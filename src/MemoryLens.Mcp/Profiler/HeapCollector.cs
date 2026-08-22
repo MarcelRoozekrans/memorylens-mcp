@@ -36,6 +36,12 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
     // stopped. Bounded so teardown can never hang the caller.
     private static readonly TimeSpan DrainTimeout = TimeSpan.FromSeconds(15);
 
+    // How long stopping the session may take before we give up on it. Stopping runs on
+    // every exit path, caller cancellation included, and nothing above this class bounds
+    // it -- an unbounded wait here is a wedged diagnostic endpoint hanging `snapshot`
+    // forever.
+    private static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(10);
+
     public async Task<SnapshotData> CollectAsync(int pid, CancellationToken ct)
     {
         var providers = new[]
@@ -93,11 +99,19 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
             // volatile, hence Volatile.Read/Write on the captured field.)
             var sawAnyEvent = 0;
 
+            // Hoisted out of the pump so EventsLost is readable once the pump is done.
+            // Assigned on the pump thread; read ONLY on the path where the pump has
+            // genuinely finished (awaited below), which is what establishes
+            // happens-before. Never touched on the abandoned path -- there the pump is
+            // still running and this would be a live race.
+            EventPipeEventSource? source = null;
+
             var pump = Task.Run(() =>
             {
-                using var source = new EventPipeEventSource(session.EventStream);
+                using var eventSource = new EventPipeEventSource(session.EventStream);
+                source = eventSource;
 
-                source.Clr.TypeBulkType += e =>
+                eventSource.Clr.TypeBulkType += e =>
                 {
                     Volatile.Write(ref sawAnyEvent, 1);
                     for (var i = 0; i < e.Count; i++)
@@ -107,7 +121,7 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                     }
                 };
 
-                source.Clr.GCBulkNode += e =>
+                eventSource.Clr.GCBulkNode += e =>
                 {
                     Volatile.Write(ref sawAnyEvent, 1);
                     for (var i = 0; i < e.Count; i++)
@@ -122,20 +136,20 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
 
                 // Completion, as dotnet-gcdump does it: remember the induced GC,
                 // finish when that same GC stops.
-                source.Clr.GCStart += (GCStartTraceData d) =>
+                eventSource.Clr.GCStart += (GCStartTraceData d) =>
                 {
                     Volatile.Write(ref sawAnyEvent, 1);
                     if (gcNum < 0 && d.Depth == 2 && d.Type != GCType.BackgroundGC)
                         gcNum = d.Count;
                 };
 
-                source.Clr.GCStop += (GCEndTraceData d) =>
+                eventSource.Clr.GCStop += (GCEndTraceData d) =>
                 {
                     if (gcNum >= 0 && d.Count == gcNum)
                         complete.TrySetResult();
                 };
 
-                source.Process();
+                eventSource.Process();
             }, CancellationToken.None);
 
             using var overall = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -147,9 +161,10 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
-                // Timed out waiting for the induced GC to finish. Fall through: the
-                // finally stops the session, and if the pump then drains cleanly we
-                // still have a complete heap to report. If it does not, we throw below.
+                // Timed out waiting for the induced GC to finish. Fall through so the
+                // finally still stops the session and the pump is still drained and
+                // observed -- but the completion check below will refuse to return
+                // whatever partial heap that produced. See the note there.
             }
             finally
             {
@@ -164,8 +179,21 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                 // enclosing `using (session)` performs the Dispose half of that pattern.
                 // StopAsync rather than Stop so we do not block a pool thread -- the one
                 // this continuation runs on is rooted in the CancelAfter timer callback.
-                try { await session.StopAsync(CancellationToken.None).ConfigureAwait(false); }
-                catch (Exception) { /* stopping a dead session is not an error */ }
+                //
+                // Bounded, because this runs on EVERY exit path including caller
+                // cancellation: a wedged diagnostic endpoint would otherwise hang
+                // `snapshot` forever, and there is nothing above this call to bound it.
+                try
+                {
+                    using var stop = new CancellationTokenSource(StopTimeout);
+                    await session.StopAsync(stop.Token).ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                    // Stopping a dead session is not an error, and neither is giving up
+                    // on a wedged one -- the drain below is what decides whether we have
+                    // an honest snapshot to return.
+                }
             }
 
             // Draining is bounded: never let teardown hang the caller. WaitAsync's timer
@@ -230,6 +258,34 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                     $"No EventPipe data arrived from process {pid} within {_timeout.TotalSeconds:N0}s. " +
                     $"The process may not be a .NET process, or may have exited during collection.");
 
+            // The EventPipe buffer is CIRCULAR. On a multi-GB heap it can wrap and drop
+            // node events, and nothing else in this method would notice: Build() would
+            // simply sum the events that survived and hand back a confident undercount
+            // with no diagnostic -- the original bug's signature exactly. Safe to read
+            // here and only here: the pump has finished, which fences the write.
+            var eventsLost = source?.EventsLost ?? 0;
+
+            if (eventsLost != 0)
+                throw new HeapCollectionException(
+                    $"EventPipe dropped {eventsLost} event(s) while collecting from process {pid}. " +
+                    $"The circular buffer wrapped, so an unknown number of heap nodes never arrived. " +
+                    $"Refusing to report a snapshot that would silently under-count the heap.");
+
+            // Did the induced GC actually report GCStop? Checked AFTER the drain, so a
+            // completion that landed between the timeout and the drain still counts.
+            //
+            // If it never fired, Stop() flushed a MID-WALK node stream: Build() sums only
+            // what arrived, and the result is internally consistent and indistinguishable
+            // from a complete snapshot. That is a silent undercount on exactly the big
+            // leaking heaps this tool exists for, so it gets the same treatment as the
+            // drain timeout above -- throw rather than answer.
+            if (!complete.Task.IsCompletedSuccessfully)
+                throw new HeapCollectionException(
+                    $"Heap collection from process {pid} did not complete within " +
+                    $"{_timeout.TotalSeconds:N0}s: the induced GC never reported completion, so the " +
+                    $"heap walk was still in progress when the session was stopped. Refusing to " +
+                    $"report a partially collected heap.");
+
             var data = Build(typeNames, counts, bytes);
 
             // An empty heap is never a real answer. Returning one is how a broken
@@ -260,6 +316,13 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
 
         foreach (var (typeId, count) in counts)
         {
+            // A node whose type id never resolved to a name is dropped, and its bytes
+            // do not appear in Heap.TotalBytes. There is deliberately no accounting row
+            // for it: SnapshotData has no field to carry one, and inventing a synthetic
+            // type would put a fabricated row in front of the rules. The lossy case this
+            // guards against -- TypeBulkType events going missing wholesale -- is now
+            // caught upstream by the EventsLost check in CollectAsync, which refuses the
+            // whole snapshot rather than letting it render as a quiet undercount.
             if (!typeNames.TryGetValue(typeId, out var name) || string.IsNullOrEmpty(name))
                 continue;
 

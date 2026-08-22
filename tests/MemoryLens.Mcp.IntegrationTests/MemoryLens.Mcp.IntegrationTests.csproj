@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- Recalibrated from the real count: 16 tests, floor = actual - 2. -->
     <TestingPlatformCommandLineArguments>--minimum-expected-tests 14</TestingPlatformCommandLineArguments>
   </PropertyGroup>
 
