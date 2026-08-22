@@ -32,6 +32,10 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
     // match the reference implementation and to hold a large real heap.
     private const int CircularBufferMb = 1024;
 
+    // How long teardown may spend draining the event stream after the session is
+    // stopped. Bounded so teardown can never hang the caller.
+    private static readonly TimeSpan DrainTimeout = TimeSpan.FromSeconds(15);
+
     public async Task<SnapshotData> CollectAsync(int pid, CancellationToken ct)
     {
         var providers = new[]
@@ -82,7 +86,12 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
             // 60s+ with no upper bound. Resuming on the pool keeps Stop() at ~100ms.
             var complete = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             long gcNum = -1;
-            var sawAnyEvent = false;
+
+            // Written on the pump thread, read on the caller's. The read below is
+            // already fenced by awaiting the pump, but this is a genuine cross-thread
+            // read and is cheap to make explicit. (A local cannot be declared
+            // volatile, hence Volatile.Read/Write on the captured field.)
+            var sawAnyEvent = 0;
 
             var pump = Task.Run(() =>
             {
@@ -90,7 +99,7 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
 
                 source.Clr.TypeBulkType += e =>
                 {
-                    sawAnyEvent = true;
+                    Volatile.Write(ref sawAnyEvent, 1);
                     for (var i = 0; i < e.Count; i++)
                     {
                         var v = e.Values(i);
@@ -100,7 +109,7 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
 
                 source.Clr.GCBulkNode += e =>
                 {
-                    sawAnyEvent = true;
+                    Volatile.Write(ref sawAnyEvent, 1);
                     for (var i = 0; i < e.Count; i++)
                     {
                         var n = e.Values(i);
@@ -115,7 +124,7 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                 // finish when that same GC stops.
                 source.Clr.GCStart += (GCStartTraceData d) =>
                 {
-                    sawAnyEvent = true;
+                    Volatile.Write(ref sawAnyEvent, 1);
                     if (gcNum < 0 && d.Depth == 2 && d.Type != GCType.BackgroundGC)
                         gcNum = d.Count;
                 };
@@ -138,22 +147,85 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
-                // Timed out waiting for completion. Fall through: stop the session and
-                // see whether what we collected is usable. If it is not, we throw below.
+                // Timed out waiting for the induced GC to finish. Fall through: the
+                // finally stops the session, and if the pump then drains cleanly we
+                // still have a complete heap to report. If it does not, we throw below.
+            }
+            finally
+            {
+                // Stopping happens on EVERY exit path, caller cancellation included.
+                // If this only ran on the success path, a cancelled caller would leave
+                // teardown to session.Dispose(), which can block unbounded on the
+                // caller's thread.
+                //
+                // dotnet-gcdump calls EndSession() here, but that is a method on its own
+                // EventPipeSessionController wrapper which forwards to Stop();
+                // EventPipeSession itself exposes no EndSession in this package. The
+                // enclosing `using (session)` performs the Dispose half of that pattern.
+                // StopAsync rather than Stop so we do not block a pool thread -- the one
+                // this continuation runs on is rooted in the CancelAfter timer callback.
+                try { await session.StopAsync(CancellationToken.None).ConfigureAwait(false); }
+                catch (Exception) { /* stopping a dead session is not an error */ }
             }
 
-            // dotnet-gcdump calls EndSession() here, but that is a method on its own
-            // EventPipeSessionController wrapper which forwards to session.Stop();
-            // EventPipeSession itself exposes no EndSession in this package. The
-            // enclosing `using (session)` performs the Dispose half of that pattern.
-            try { session.Stop(); } catch (Exception) { /* stopping a dead session is not an error */ }
-
-            // Draining is bounded: never let teardown hang the caller.
-            await Task.WhenAny(pump, Task.Delay(TimeSpan.FromSeconds(15), CancellationToken.None)).ConfigureAwait(false);
+            // Draining is bounded: never let teardown hang the caller. WaitAsync's timer
+            // is torn down when the wait resolves, so no timer or Task is left live.
+            // Awaiting the pump here is also what establishes happens-before for the
+            // dictionaries below, and what marks a pump fault observed.
+            var pumpFinished = true;
+            try
+            {
+                await pump.WaitAsync(DrainTimeout, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                pumpFinished = false;
+            }
+            catch (Exception)
+            {
+                // The pump faulted. Surfaced just below from pump.Exception so the real
+                // root cause reaches the caller; observed by having awaited it here.
+            }
 
             ct.ThrowIfCancellationRequested();
 
-            if (!sawAnyEvent)
+            // A pump fault is the root cause; everything below it is a symptom. This is
+            // reachable in normal operation: disposing the session closes EventStream
+            // under an actively-reading pump. Without this the exception would be lost
+            // to UnobservedTaskException and the caller would get a misleading
+            // "no data arrived" after burning the whole timeout.
+            if (pump.IsFaulted)
+            {
+                var fault = pump.Exception is { InnerExceptions.Count: 1 } single
+                    ? single.InnerExceptions[0]
+                    : pump.Exception!;
+
+                throw new HeapCollectionException(
+                    $"Reading the EventPipe stream from process {pid} failed: {fault.Message}", fault);
+            }
+
+            // The pump is STILL RUNNING and still writing to typeNames/counts/bytes.
+            // Reading them from this thread would be an unsynchronised race against
+            // Dictionary insert and resize: a reader racing a resize can throw, read a
+            // torn entry, or spin forever in bucket traversal -- an unbounded hang that
+            // no timeout in this method covers, reachable precisely when the heap is
+            // large. So do not touch them at all on this path. A loud failure beats a
+            // silent undercount for a leak-finding tool.
+            if (!pumpFinished)
+            {
+                // We are abandoning the pump. Disposing the session closes EventStream
+                // under it, so it will very likely fault -- observe that fault here or
+                // it resurfaces as an UnobservedTaskException on the finalizer thread,
+                // in an unrelated part of the process.
+                _ = pump.ContinueWith(static t => _ = t.Exception, TaskScheduler.Default);
+
+                throw new HeapCollectionException(
+                    $"Heap collection from process {pid} did not complete: the event stream was " +
+                    $"still being read {DrainTimeout.TotalSeconds:N0}s after the session was stopped. " +
+                    $"Refusing to report a snapshot assembled from a partially written heap.");
+            }
+
+            if (Volatile.Read(ref sawAnyEvent) == 0)
                 throw new HeapCollectionException(
                     $"No EventPipe data arrived from process {pid} within {_timeout.TotalSeconds:N0}s. " +
                     $"The process may not be a .NET process, or may have exited during collection.");
@@ -162,9 +234,13 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
 
             // An empty heap is never a real answer. Returning one is how a broken
             // pipeline renders as "no memory issues found" -- see issue #161.
-            if (data.Types.Count == 0)
+            // TotalBytes is checked too: a snapshot with rows but zero bytes is just
+            // as useless downstream, and the tests already demand TotalBytes > 0, so
+            // without it the product would enforce less than its own tests expect.
+            if (data.Types.Count == 0 || data.Heap.TotalBytes <= 0)
                 throw new HeapCollectionException(
-                    $"Heap collection from process {pid} produced no objects. Refusing to report an empty snapshot.");
+                    $"Heap collection from process {pid} produced no objects ({data.Types.Count} types, " +
+                    $"{data.Heap.TotalBytes} bytes). Refusing to report an empty snapshot.");
 
             return data;
         }
