@@ -204,6 +204,53 @@ public class ToolIntegrationTests
     }
 
     [Fact]
+    public async Task Snapshot_MissingPid_ReturnsError()
+    {
+        var root = NewSnapshotRoot();
+        try
+        {
+            var collector = new FakeHeapCollector();
+            var store = new SnapshotStore(root);
+            var filter = new ProcessFilter();
+            var tool = new SnapshotTool(collector, store, filter);
+
+            var json = await tool.snapshot(ct: TestContext.Current.CancellationToken);
+            var doc = JsonDocument.Parse(json);
+
+            Assert.False(doc.RootElement.GetProperty("Success").GetBoolean());
+            Assert.False(string.IsNullOrEmpty(doc.RootElement.GetProperty("Error").GetString()));
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    /// <summary>
+    /// The bug this rewrite fixes reported "no memory issues found" on a leaking
+    /// heap -- a collection failure must come back as a legible error, not be
+    /// swallowed or left to propagate as an unhandled exception.
+    /// </summary>
+    [Fact]
+    public async Task Snapshot_CollectionFails_ReturnsError()
+    {
+        var root = NewSnapshotRoot();
+        try
+        {
+            var collector = new FakeHeapCollector(failureMessage: "process exited before collection completed");
+            var store = new SnapshotStore(root);
+            var filter = new ProcessFilter();
+            var tool = new SnapshotTool(collector, store, filter);
+
+            var json = await tool.snapshot(pid: 1234, ct: TestContext.Current.CancellationToken);
+            var doc = JsonDocument.Parse(json);
+
+            Assert.False(doc.RootElement.GetProperty("Success").GetBoolean());
+            Assert.Equal(
+                "process exited before collection completed",
+                doc.RootElement.GetProperty("Error").GetString());
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
     public async Task CompareSnapshots_ReturnsComparisonResult()
     {
         var root = NewSnapshotRoot();
@@ -218,6 +265,50 @@ public class ToolIntegrationTests
 
             Assert.True(doc.RootElement.GetProperty("Success").GetBoolean());
             Assert.Equal(2, doc.RootElement.GetProperty("SnapshotCount").GetInt32());
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task CompareSnapshots_MissingPid_ReturnsError()
+    {
+        var root = NewSnapshotRoot();
+        try
+        {
+            var collector = new FakeHeapCollector();
+            var store = new SnapshotStore(root);
+            var tool = new CompareSnapshotsTool(collector, store);
+
+            var json = await tool.compare_snapshots(ct: TestContext.Current.CancellationToken);
+            var doc = JsonDocument.Parse(json);
+
+            Assert.False(doc.RootElement.GetProperty("Success").GetBoolean());
+            Assert.False(string.IsNullOrEmpty(doc.RootElement.GetProperty("Error").GetString()));
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    /// <summary>
+    /// Same defect class as Snapshot_CollectionFails_ReturnsError: a collection
+    /// failure during compare must come back as a legible error, not propagate.
+    /// </summary>
+    [Fact]
+    public async Task CompareSnapshots_CollectionFails_ReturnsError()
+    {
+        var root = NewSnapshotRoot();
+        try
+        {
+            var collector = new FakeHeapCollector(failureMessage: "diagnostics port unavailable");
+            var store = new SnapshotStore(root);
+            var tool = new CompareSnapshotsTool(collector, store);
+
+            var json = await tool.compare_snapshots(pid: 1234, delaySeconds: 0, ct: TestContext.Current.CancellationToken);
+            var doc = JsonDocument.Parse(json);
+
+            Assert.False(doc.RootElement.GetProperty("Success").GetBoolean());
+            Assert.Equal(
+                "diagnostics port unavailable",
+                doc.RootElement.GetProperty("Error").GetString());
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }

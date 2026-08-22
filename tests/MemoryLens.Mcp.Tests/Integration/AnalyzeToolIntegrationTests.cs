@@ -13,26 +13,46 @@ namespace MemoryLens.Mcp.Tests.Integration;
 /// </summary>
 public class AnalyzeToolIntegrationTests
 {
-    // GcDumpReportParser stays around unwired (Task 5 deletes it); reused here purely as a
-    // convenient text-to-SnapshotData fixture builder so these fixtures don't need to be
-    // hand-written as TypeInfo lists.
-    private const string LeakyAppReport = """
-                  MT    Count    TotalSize Class Name
-        00007ff8a1000010    30000     3600000 System.String
-        00007ff8a1000020      100      250000 System.EventHandler`1[[MyApp.DataChanged]]
-        00007ff8a1000030       80      400000 System.IO.StreamReader
-        00007ff8a1000040       60      180000 MyApp.Handlers.RequestHandler+<>c__DisplayClass2_0
-        Total    30240     4430000
-        """;
+    // Fixtures are hand-built SnapshotData rather than parsed gcdump text, so these
+    // tests do not depend on GcDumpReportParser (Task 5 deletes it).
+    private static SnapshotData LeakyAppSnapshot() => new()
+    {
+        Types =
+        [
+            new TypeInfo { FullName = "System.String", InstanceCount = 30000, TotalBytes = 3600000 },
+            new TypeInfo
+            {
+                FullName = "System.EventHandler`1[[MyApp.DataChanged]]",
+                InstanceCount = 100,
+                TotalBytes = 250000,
+                ImplementsIDisposable = true,
+            },
+            new TypeInfo
+            {
+                FullName = "System.IO.StreamReader",
+                InstanceCount = 80,
+                TotalBytes = 400000,
+                ImplementsIDisposable = true,
+            },
+            new TypeInfo
+            {
+                FullName = "MyApp.Handlers.RequestHandler+<>c__DisplayClass2_0",
+                InstanceCount = 60,
+                TotalBytes = 180000,
+                ImplementsIDisposable = true,
+            },
+        ],
+        Heap = new HeapInfo { TotalBytes = 4430000 },
+    };
 
     private static string NewRoot() =>
         Path.Combine(Path.GetTempPath(), "memorylens-analyze-tool-tests-" + Guid.NewGuid().ToString("N"));
 
-    private static async Task<(SnapshotStore Store, string Id)> SaveReportAsync(
-        string root, string report, CancellationToken ct)
+    private static async Task<(SnapshotStore Store, string Id)> SaveAsync(
+        string root, SnapshotData data, CancellationToken ct)
     {
         var store = new SnapshotStore(root);
-        var id = await store.SaveAsync(GcDumpReportParser.Parse(report), ct).ConfigureAwait(false);
+        var id = await store.SaveAsync(data, ct).ConfigureAwait(false);
         return (store, id);
     }
 
@@ -42,7 +62,7 @@ public class AnalyzeToolIntegrationTests
         var root = NewRoot();
         try
         {
-            var (store, id) = await SaveReportAsync(root, LeakyAppReport, TestContext.Current.CancellationToken);
+            var (store, id) = await SaveAsync(root, LeakyAppSnapshot(), TestContext.Current.CancellationToken);
             var engine = new AnalysisEngine(new MemoryLensConfig(), new SnapshotReader(store));
             var tool = new AnalyzeTool(engine);
 
@@ -50,11 +70,11 @@ public class AnalyzeToolIntegrationTests
 
             // Should be valid JSON
             var doc = JsonDocument.Parse(json);
-            var root2 = doc.RootElement;
+            var resultRoot = doc.RootElement;
 
             // Should have findings array and count
-            Assert.True(root2.TryGetProperty("findings", out var findings));
-            Assert.True(root2.TryGetProperty("count", out var count));
+            Assert.True(resultRoot.TryGetProperty("findings", out var findings));
+            Assert.True(resultRoot.TryGetProperty("count", out var count));
             Assert.True(count.GetInt32() > 0);
             Assert.True(findings.GetArrayLength() > 0);
 
@@ -75,26 +95,44 @@ public class AnalyzeToolIntegrationTests
     [Fact]
     public async Task Analyze_ComparisonMode_ReturnsGrowthFindings()
     {
-        var beforeReport = """
-                      MT    Count    TotalSize Class Name
-            00007ff8a1000010     5000      600000 System.String
-            00007ff8a1000020       10       25000 System.EventHandler
-            Total     5010      625000
-            """;
+        var before = new SnapshotData
+        {
+            Types =
+            [
+                new TypeInfo { FullName = "System.String", InstanceCount = 5000, TotalBytes = 600000 },
+                new TypeInfo
+                {
+                    FullName = "System.EventHandler",
+                    InstanceCount = 10,
+                    TotalBytes = 25000,
+                    ImplementsIDisposable = true,
+                },
+            ],
+            Heap = new HeapInfo { TotalBytes = 625000 },
+        };
 
-        var afterReport = """
-                      MT    Count    TotalSize Class Name
-            00007ff8a1000010    25000     3000000 System.String
-            00007ff8a1000020       80      200000 System.EventHandler
-            Total    25080     3200000
-            """;
+        var after = new SnapshotData
+        {
+            Types =
+            [
+                new TypeInfo { FullName = "System.String", InstanceCount = 25000, TotalBytes = 3000000 },
+                new TypeInfo
+                {
+                    FullName = "System.EventHandler",
+                    InstanceCount = 80,
+                    TotalBytes = 200000,
+                    ImplementsIDisposable = true,
+                },
+            ],
+            Heap = new HeapInfo { TotalBytes = 3200000 },
+        };
 
         var root = NewRoot();
         try
         {
             var store = new SnapshotStore(root);
-            var beforeId = await store.SaveAsync(GcDumpReportParser.Parse(beforeReport), TestContext.Current.CancellationToken);
-            var afterId = await store.SaveAsync(GcDumpReportParser.Parse(afterReport), TestContext.Current.CancellationToken);
+            var beforeId = await store.SaveAsync(before, TestContext.Current.CancellationToken);
+            var afterId = await store.SaveAsync(after, TestContext.Current.CancellationToken);
             var engine = new AnalysisEngine(new MemoryLensConfig(), new SnapshotReader(store));
             var tool = new AnalyzeTool(engine);
 
@@ -133,7 +171,7 @@ public class AnalyzeToolIntegrationTests
         var root = NewRoot();
         try
         {
-            var (store, id) = await SaveReportAsync(root, LeakyAppReport, TestContext.Current.CancellationToken);
+            var (store, id) = await SaveAsync(root, LeakyAppSnapshot(), TestContext.Current.CancellationToken);
             var config = ConfigLoader.Parse("""
                 {
                     "rules": {

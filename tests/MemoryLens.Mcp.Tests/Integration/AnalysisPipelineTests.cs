@@ -13,33 +13,72 @@ namespace MemoryLens.Mcp.Tests.Integration;
 public class AnalysisPipelineTests
 {
     /// <summary>
-    /// Simulates a realistic gcdump report from a .NET web app with memory issues.
-    /// GcDumpReportParser stays around unwired (Task 5 deletes it); reused here purely
-    /// as a convenient text-to-SnapshotData fixture builder.
+    /// Simulates a realistic heap from a .NET web app with memory issues. Hand-built
+    /// SnapshotData rather than parsed gcdump text, so these tests do not depend on
+    /// GcDumpReportParser (Task 5 deletes it).
     /// </summary>
-    private const string RealisticGcDumpReport = """
-                  MT    Count    TotalSize Class Name
-        00007ff8a1000010    55000     6600000 System.String
-        00007ff8a1000020      200      500000 System.EventHandler
-        00007ff8a1000030      150     2000000 System.IO.FileStream
-        00007ff8a1000040     5000     3000000 System.Object[]
-        00007ff8a1000050      120      300000 System.Collections.Generic.List`1[[System.String]]
-        00007ff8a1000060       80      250000 MyApp.Services.UserService+<>c__DisplayClass5_0
-        00007ff8a1000070       10     1200000 System.Byte[]
-        00007ff8a1000080       15      100000 System.Int32
-        00007ff8a1000090        5         500 MyApp.NativeWrapper
-        00007ff8a10000a0       30       50000 System.Threading.Timer
-        Total    60610    13900500
-        """;
+    private static SnapshotData RealisticSnapshot() => new()
+    {
+        Types =
+        [
+            new TypeInfo { FullName = "System.String", InstanceCount = 55000, TotalBytes = 6600000 },
+            new TypeInfo
+            {
+                FullName = "System.EventHandler",
+                InstanceCount = 200,
+                TotalBytes = 500000,
+                ImplementsIDisposable = true,
+            },
+            new TypeInfo
+            {
+                FullName = "System.IO.FileStream",
+                InstanceCount = 150,
+                TotalBytes = 2000000,
+                ImplementsIDisposable = true,
+                HasFinalizer = true,
+            },
+            new TypeInfo { FullName = "System.Object[]", InstanceCount = 5000, TotalBytes = 3000000 },
+            new TypeInfo
+            {
+                FullName = "System.Collections.Generic.List`1[[System.String]]",
+                InstanceCount = 120,
+                TotalBytes = 300000,
+            },
+            new TypeInfo
+            {
+                FullName = "MyApp.Services.UserService+<>c__DisplayClass5_0",
+                InstanceCount = 80,
+                TotalBytes = 250000,
+            },
+            new TypeInfo
+            {
+                FullName = "System.Byte[]",
+                InstanceCount = 10,
+                TotalBytes = 1200000,
+                IsLargeObjectHeap = true,
+            },
+            new TypeInfo { FullName = "System.Int32", InstanceCount = 15, TotalBytes = 100000 },
+            new TypeInfo { FullName = "MyApp.NativeWrapper", InstanceCount = 5, TotalBytes = 500 },
+            new TypeInfo
+            {
+                FullName = "System.Threading.Timer",
+                InstanceCount = 30,
+                TotalBytes = 50000,
+                ImplementsIDisposable = true,
+                HasFinalizer = true,
+            },
+        ],
+        Heap = new HeapInfo { TotalBytes = 13900500, LargeObjectHeapBytes = 1200000, LargeObjectCount = 10 },
+    };
 
     private static string NewRoot() =>
         Path.Combine(Path.GetTempPath(), "memorylens-pipeline-tests-" + Guid.NewGuid().ToString("N"));
 
-    private static async Task<(SnapshotStore Store, string Id)> SaveReportAsync(
-        string root, string report, CancellationToken ct)
+    private static async Task<(SnapshotStore Store, string Id)> SaveAsync(
+        string root, SnapshotData data, CancellationToken ct)
     {
         var store = new SnapshotStore(root);
-        var id = await store.SaveAsync(GcDumpReportParser.Parse(report), ct).ConfigureAwait(false);
+        var id = await store.SaveAsync(data, ct).ConfigureAwait(false);
         return (store, id);
     }
 
@@ -49,7 +88,7 @@ public class AnalysisPipelineTests
         var root = NewRoot();
         try
         {
-            var (store, id) = await SaveReportAsync(root, RealisticGcDumpReport, TestContext.Current.CancellationToken);
+            var (store, id) = await SaveAsync(root, RealisticSnapshot(), TestContext.Current.CancellationToken);
             var config = new MemoryLensConfig();
             var engine = new AnalysisEngine(config, new SnapshotReader(store));
 
@@ -89,7 +128,7 @@ public class AnalysisPipelineTests
         var root = NewRoot();
         try
         {
-            var (store, id) = await SaveReportAsync(root, RealisticGcDumpReport, TestContext.Current.CancellationToken);
+            var (store, id) = await SaveAsync(root, RealisticSnapshot(), TestContext.Current.CancellationToken);
             var engine = new AnalysisEngine(new MemoryLensConfig(), new SnapshotReader(store));
 
             var context = new SnapshotAnalysisContext(
@@ -115,28 +154,56 @@ public class AnalysisPipelineTests
     [Fact]
     public async Task FullPipeline_Comparison_DetectsGrowth()
     {
-        var beforeReport = """
-                      MT    Count    TotalSize Class Name
-            00007ff8a1000010    10000     1200000 System.String
-            00007ff8a1000020       20       50000 System.EventHandler
-            00007ff8a1000030       50      100000 System.Collections.Generic.Dictionary`2[[System.String,System.Object]]
-            Total    10070     1350000
-            """;
+        var before = new SnapshotData
+        {
+            Types =
+            [
+                new TypeInfo { FullName = "System.String", InstanceCount = 10000, TotalBytes = 1200000 },
+                new TypeInfo
+                {
+                    FullName = "System.EventHandler",
+                    InstanceCount = 20,
+                    TotalBytes = 50000,
+                    ImplementsIDisposable = true,
+                },
+                new TypeInfo
+                {
+                    FullName = "System.Collections.Generic.Dictionary`2[[System.String,System.Object]]",
+                    InstanceCount = 50,
+                    TotalBytes = 100000,
+                },
+            ],
+            Heap = new HeapInfo { TotalBytes = 1350000 },
+        };
 
-        var afterReport = """
-                      MT    Count    TotalSize Class Name
-            00007ff8a1000010    35000     4200000 System.String
-            00007ff8a1000020      150      375000 System.EventHandler
-            00007ff8a1000030      120      500000 System.Collections.Generic.Dictionary`2[[System.String,System.Object]]
-            Total    35270     5075000
-            """;
+        var after = new SnapshotData
+        {
+            Types =
+            [
+                new TypeInfo { FullName = "System.String", InstanceCount = 35000, TotalBytes = 4200000 },
+                new TypeInfo
+                {
+                    FullName = "System.EventHandler",
+                    InstanceCount = 150,
+                    TotalBytes = 375000,
+                    ImplementsIDisposable = true,
+                },
+                new TypeInfo
+                {
+                    FullName = "System.Collections.Generic.Dictionary`2[[System.String,System.Object]]",
+                    InstanceCount = 120,
+                    TotalBytes = 500000,
+                },
+            ],
+            Heap = new HeapInfo { TotalBytes = 5075000 },
+        };
 
         var root = NewRoot();
         try
         {
             var store = new SnapshotStore(root);
-            var beforeId = await store.SaveAsync(GcDumpReportParser.Parse(beforeReport), TestContext.Current.CancellationToken);
-            var afterId = await store.SaveAsync(GcDumpReportParser.Parse(afterReport), TestContext.Current.CancellationToken);
+            var beforeId = await store.SaveAsync(before, TestContext.Current.CancellationToken);
+            var afterId = await store.SaveAsync(after, TestContext.Current.CancellationToken);
             var engine = new AnalysisEngine(new MemoryLensConfig(), new SnapshotReader(store));
 
             var context = new SnapshotAnalysisContext(
@@ -164,7 +231,7 @@ public class AnalysisPipelineTests
         var root = NewRoot();
         try
         {
-            var (store, id) = await SaveReportAsync(root, RealisticGcDumpReport, TestContext.Current.CancellationToken);
+            var (store, id) = await SaveAsync(root, RealisticSnapshot(), TestContext.Current.CancellationToken);
             var config = new MemoryLensConfig
             {
                 Rules = new Dictionary<string, RuleOverride>
@@ -194,7 +261,7 @@ public class AnalysisPipelineTests
         var root = NewRoot();
         try
         {
-            var (store, id) = await SaveReportAsync(root, RealisticGcDumpReport, TestContext.Current.CancellationToken);
+            var (store, id) = await SaveAsync(root, RealisticSnapshot(), TestContext.Current.CancellationToken);
             var config = new MemoryLensConfig
             {
                 Rules = new Dictionary<string, RuleOverride>
@@ -220,7 +287,7 @@ public class AnalysisPipelineTests
     /// The old analyzer swallowed a failing external tool and returned an empty
     /// snapshot, so rules silently produced no findings. The new pipeline never does
     /// that: a snapshot id/path that cannot be loaded is a real failure and surfaces
-    /// as an exception instead of being papered over.
+    /// as an exception -- naming the missing id -- instead of being papered over.
     /// </summary>
     [Fact]
     public async Task FullPipeline_UnreadableSnapshot_Throws()
@@ -234,8 +301,10 @@ public class AnalysisPipelineTests
             var context = new SnapshotAnalysisContext(
                 "snap-abc123", "no-such-snapshot", null, null, false, null);
 
-            await Assert.ThrowsAsync<FileNotFoundException>(
+            var ex = await Assert.ThrowsAsync<FileNotFoundException>(
                 () => engine.AnalyzeAsync(context, TestContext.Current.CancellationToken));
+
+            Assert.Contains("no-such-snapshot", ex.Message, StringComparison.Ordinal);
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
@@ -244,18 +313,21 @@ public class AnalysisPipelineTests
     public async Task FullPipeline_CleanApp_NoFindings()
     {
         // Small, healthy app — nothing should trigger
-        var cleanReport = """
-                      MT    Count    TotalSize Class Name
-            00007ff8a1000010      100       10000 System.String
-            00007ff8a1000020        5         500 System.Object[]
-            00007ff8a1000030        2         200 System.Int32
-            Total      107       10700
-            """;
+        var clean = new SnapshotData
+        {
+            Types =
+            [
+                new TypeInfo { FullName = "System.String", InstanceCount = 100, TotalBytes = 10000 },
+                new TypeInfo { FullName = "System.Object[]", InstanceCount = 5, TotalBytes = 500 },
+                new TypeInfo { FullName = "System.Int32", InstanceCount = 2, TotalBytes = 200 },
+            ],
+            Heap = new HeapInfo { TotalBytes = 10700 },
+        };
 
         var root = NewRoot();
         try
         {
-            var (store, id) = await SaveReportAsync(root, cleanReport, TestContext.Current.CancellationToken);
+            var (store, id) = await SaveAsync(root, clean, TestContext.Current.CancellationToken);
             var engine = new AnalysisEngine(new MemoryLensConfig(), new SnapshotReader(store));
 
             var context = new SnapshotAnalysisContext(
