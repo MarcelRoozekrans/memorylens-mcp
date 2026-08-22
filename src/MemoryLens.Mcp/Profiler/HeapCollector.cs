@@ -494,7 +494,14 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
             var count = acc.Count;
             var size = acc.Bytes;
             var avg = count > 0 ? size / count : 0;
-            var isLoh = avg >= 85_000;
+            var generation = DominantGeneration(acc.Generations);
+
+            // Generation 3 IS the Large Object Heap -- the runtime answers directly
+            // what the average-size heuristic below only guessed at. The heuristic
+            // survives solely as a fallback for a type whose instances never mapped
+            // to a reported generation range (generation == -1), so classification
+            // never gets worse than it was before generations were tracked.
+            var isLoh = generation == 3 || (generation < 0 && avg >= 85_000);
 
             if (isLoh)
             {
@@ -510,7 +517,7 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                 IsLargeObjectHeap = isLoh,
                 ImplementsIDisposable = TypeClassifier.IsLikelyDisposable(name),
                 HasFinalizer = TypeClassifier.IsLikelyFinalizable(name),
-                DominantGeneration = DominantGeneration(acc.Generations),
+                DominantGeneration = generation,
             });
         }
 

@@ -1,20 +1,5 @@
 namespace MemoryLens.Mcp.Rules.BuiltIn;
 
-/// <remarks>
-/// <para>
-/// <b>This rule cannot fire today.</b> It requires <c>TypeInfo.DominantGeneration</c>
-/// to be &gt;= 2, and the in-process EventPipe collector (<c>HeapCollector.Build</c>)
-/// never populates that field — every type keeps its <c>-1</c> default, so every type
-/// is skipped and the rule always returns zero findings.
-/// </para>
-/// <para>
-/// It is still registered and still listed by <c>get_rules</c>, so a user asking "is
-/// anything retained too long?" gets a confident permanent "no". Populating
-/// <c>DominantGeneration</c> needs additional EventPipe event subscriptions and is
-/// tracked as Part 2 work; it is a feature, not a fix, and is deliberately out of scope
-/// here. Until then, treat this rule's silence as "not measured", not as "nothing found".
-/// </para>
-/// </remarks>
 public class ML005_ObjectRetainedTooLong : IRule
 {
     public string Id => "ML005";
