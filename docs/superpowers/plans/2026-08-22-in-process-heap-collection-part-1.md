@@ -1555,3 +1555,31 @@ Part 2 covers what this part deliberately leaves alone:
 - **`docs/docker.md`** still documents mounting a volume so a runtime profiler download survives `--rm`. There is no download any more; the image is self-contained.
 - **The `command` parameter on `snapshot`** is accepted but not implemented (Task 4, Step 3). Launch-then-attach is a start-up race needing its own design and test.
 - **The nightly `e2e.yml` tier** from the superseded Phase 3 — Docker, npm shim, pack assertion — is now much smaller and no longer licence-gated.
+
+Added during execution — these were discovered while building Part 1 and are not in the
+original spec:
+
+- **ML005 can never fire.** `ML005_ObjectRetainedTooLong` requires `DominantGeneration >= 2`;
+  `HeapCollector.Build` never populates it, so it keeps its `-1` default and every type is
+  skipped — while `get_rules` still advertises the rule as active. Populating generation needs
+  new event subscriptions (`GCGenerationRange` / `GCBulkSurvivingObjectRanges`), which is a
+  feature, not a fix. An XML remark on the rule records this; Part 2 should either implement it
+  or make the rule visibly inactive.
+- **`processName` is effectively a no-op** on both `snapshot` and `compare_snapshots` — it only
+  feeds `ProcessFilter.IsExcluded`, so the exclusion guard is trivially bypassed by passing a
+  bare pid. `SKILL.md`'s Red Flag #1 nonetheless claims the product excludes IDE processes.
+- **Parameter-level `[Description]` strings still advertise unimplemented behaviour.** The
+  tool-level descriptions were corrected, but `command` and `processName` keep parameter
+  descriptions the MCP client shows the calling model.
+- **Unresolved type ids lose their bytes silently** in `HeapCollector.Build`. The wholesale case
+  is now caught by the `EventsLost` guard, but per-id losses have nowhere to be reported without
+  a field on `SnapshotData`.
+- **Two guards remain untestable** — the empty-snapshot guard and the drain-expired throw. No
+  reachable scenario produces either; covering them needs an injectable event-source seam the
+  design lacks.
+- **`ProcessRunner`/`IProcessRunner` now has zero consumers and zero tests.** Kept deliberately
+  because Part 2's launch-then-attach needs it — but Part 2 will be building on a component with
+  no assertions against it.
+- **The Dockerfile's SDK base image exists only because the deleted `DotMemoryToolManager`
+  needed `dotnet tool install -g`.** That reason is gone, so Part 2 can likely move to the much
+  smaller `dotnet/runtime` image.
