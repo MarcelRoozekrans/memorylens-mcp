@@ -42,6 +42,21 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
     // forever.
     private static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(10);
 
+    // Ceiling on the node addresses buffered while bucketing generations (the note at
+    // the declaration of `addresses` below explains why they have to be buffered at
+    // all). 32M addresses is 256MB of ulong, the same order as the circular buffer
+    // above, and covers any heap this tool is realistically pointed at: 32M live
+    // objects is a 1.5-3GB live set at typical object sizes.
+    //
+    // Past it the collection THROWS rather than truncating. The heap walk emits nodes
+    // in address order, so a truncated buffer is a spatially biased sample, and a
+    // biased sample yields a confidently WRONG dominant generation rather than a merely
+    // approximate one. Everything else in this file refuses rather than degrades --
+    // drain timeout, EventsLost, incomplete GC, empty snapshot -- and an unbounded
+    // buffer inside a long-lived MCP server would have been the one place where a large
+    // heap damaged the host instead of producing a loud failure.
+    private const int MaxBufferedAddresses = 32_000_000;
+
     public async Task<SnapshotData> CollectAsync(int pid, CancellationToken ct)
     {
         var providers = new[]
@@ -100,10 +115,26 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
             // pre-GC layout, which labels every survivor with the generation it was in
             // before the collection promoted it. The post-GC burst is the layout the
             // dumped addresses actually belong to, because the heap walk runs at the end
-            // of the GC, after relocation. Buffering costs 8 bytes per live object and
-            // buys the correct answer.
+            // of the GC, after relocation. Buffering costs 8 bytes per live object, is
+            // capped at MaxBufferedAddresses, and buys the correct answer.
             var addresses = new Dictionary<ulong, List<ulong>>();
+            var bufferedAddresses = 0;
+
+            // Only the ranges that arrived after the LAST node event survive in here --
+            // see the GCGenerationRange handler for why.
             var ranges = new List<(int Generation, ulong Start, ulong End)>();
+
+            // Pump-thread only. Set by every node event and cleared by the next range
+            // event, which is what lets the range handler recognise the start of a burst
+            // that follows nodes.
+            var nodesSinceLastRange = false;
+
+            // Written on the pump thread when the address budget is exhausted, read on
+            // the caller thread beside the EventsLost guard. A flag rather than a throw
+            // from inside the handler on purpose: an exception unwinding through
+            // TraceEvent's dispatch loop is a far less understood path than the refusal
+            // machinery this method already has.
+            var addressBudgetExceeded = 0;
 
             // RunContinuationsAsynchronously is load-bearing, not a style choice.
             // TrySetResult below is called from inside an EventPipe callback on the
@@ -155,10 +186,22 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                         bytes.TryGetValue(n.TypeID, out var b);
                         bytes[n.TypeID] = b + (long)n.Size;
 
+                        if (bufferedAddresses >= MaxBufferedAddresses)
+                        {
+                            // Stop appending -- but do not quietly carry on. A truncated
+                            // buffer would bias every mode computed from here on, so the
+                            // caller-side guard turns this flag into a refusal.
+                            Volatile.Write(ref addressBudgetExceeded, 1);
+                            continue;
+                        }
+
                         if (!addresses.TryGetValue(n.TypeID, out var addrs))
                             addresses[n.TypeID] = addrs = [];
                         addrs.Add(n.Address);
+                        bufferedAddresses++;
                     }
+
+                    nodesSinceLastRange = true;
                 };
 
                 // Deliberately does NOT set sawAnyEvent. That flag means "heap data
@@ -166,6 +209,29 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                 // empty heap and must still be refused below.
                 eventSource.Clr.GCGenerationRange += e =>
                 {
+                    // Keep ONLY the ranges that arrived after the last node event.
+                    //
+                    // The addresses on GCBulkNode come from the end-of-GC heap walk, so
+                    // they live in the POST-GC layout. A region the post-GC burst does
+                    // not claim is not part of that layout, and labelling an object
+                    // there from the pre-GC burst is a guess -- exactly what an
+                    // unmappable node must not get. Dropping the earlier burst the
+                    // moment a later one starts leaves those addresses at -1, which is
+                    // the honest answer.
+                    //
+                    // It also means a third burst -- a concurrent background GC
+                    // publishing its own ranges -- replaces its predecessor rather than
+                    // being merged into it.
+                    //
+                    // No timestamps are consulted: the reset is driven purely by having
+                    // seen a node since the previous range event, so what survives is
+                    // precisely the last group of ranges with no node between them.
+                    if (nodesSinceLastRange)
+                    {
+                        ranges.Clear();
+                        nodesSinceLastRange = false;
+                    }
+
                     ranges.Add((e.Generation, e.RangeStart, e.RangeStart + e.RangeUsedLength));
                 };
 
@@ -306,6 +372,16 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                     $"EventPipe dropped {eventsLost} event(s) while collecting from process {pid}. " +
                     $"The circular buffer wrapped, so an unknown number of heap nodes never arrived. " +
                     $"Refusing to report a snapshot that would silently under-count the heap.");
+
+            // Same shape and same reason as the guard above. Safe to read here and only
+            // here: the pump has finished, which fences the write.
+            if (Volatile.Read(ref addressBudgetExceeded) != 0)
+                throw new HeapCollectionException(
+                    $"Heap collection from process {pid} exceeded the {MaxBufferedAddresses:N0} " +
+                    $"object budget for generation bucketing. The heap walk emits nodes in " +
+                    $"address order, so carrying on with a truncated address buffer would report " +
+                    $"a confidently wrong dominant generation for every type beyond the budget. " +
+                    $"Refusing to report a snapshot whose generations would be biased.");
 
             // Did the induced GC actually report GCStop? Checked AFTER the drain, so a
             // completion that landed between the timeout and the drain still counts.
@@ -495,13 +571,14 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
         public static GenerationMap Build(List<(int Generation, ulong Start, ulong End)> ranges)
         {
             // Cut the address space at every reported boundary, then label each resulting
-            // slice with the LAST range that covers it. Last wins because the ranges
-            // arrive in two bursts, one at GC start and one at GC end, and the node
-            // addresses in the dump are post-relocation -- so where the bursts disagree,
-            // the later one describes the heap the addresses actually came from. Slices
-            // that only an earlier burst covers still keep that burst's answer rather
-            // than falling to -1: stale information about a region the current burst no
-            // longer reports still beats no information.
+            // slice with the LAST range that covers it.
+            //
+            // By the time this runs, `ranges` holds a single burst -- the collector drops
+            // everything published before the last node event -- so the ranges are
+            // already disjoint and last-wins is only a deterministic tie-break for a
+            // runtime that overlapped two ranges inside one burst. Nothing here reaches
+            // back to an earlier burst to fill a gap; an address the surviving burst does
+            // not cover gets -1, not a guess.
             var points = new List<ulong>(ranges.Count * 2);
             foreach (var (_, start, end) in ranges)
             {
