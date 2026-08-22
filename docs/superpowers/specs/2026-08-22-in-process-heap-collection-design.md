@@ -222,17 +222,47 @@ depend on them.
 ### Session lifecycle — the real risk
 
 The spike printed `TIMEOUT`. The data was complete and correct, but the session
-was never stopped, so `source.Process()` blocked forever. There is no obvious
-"heap dump complete" event to await. The collector therefore needs:
+was never stopped, so `source.Process()` blocked forever.
 
-1. A stop condition on the GC-end marker following the bulk-node stream, then
-   `session.Stop()`.
-2. An overall timeout (default 30s, matching `dotnet-gcdump`) that stops the
-   session and throws `HeapCollectionTimeoutException` carrying the node and
-   type event counts seen so far.
-3. `CancellationToken` honoured by stopping the session — the same lesson as
-   `McpStdioClient`, where cancelling a blocked read did not work and the real
-   bound had to come from outside.
+**A second, targeted probe established why, and it inverts the obvious design.**
+Instrumenting `GCStop` and `GCHeapStats` as candidate completion markers against
+a long-lived target produced:
+
+```
+[ 30011ms] stop marker fired: False      <- nothing arrived during a 30s wait
+[ 30136ms] session.Stop() returned
+[ 30140ms] GCStop  depth=2 nodes=31 types=3   <- everything flushed AFTER Stop
+[ 30142ms] source.Process() RETURNED
+[ 30142ms] pump drained cleanly: True
+FINAL nodes=31 types=3 edges=12
+```
+
+**EventPipe buffers the events and flushes them when the session stops.** The
+end marker is a *consequence* of stopping, not a signal to stop. Waiting for a
+completion event in the stream therefore deadlocks by construction — which is
+exactly what the first spike hit.
+
+The collector must instead:
+
+1. Start the session, run `EventPipeEventSource.Process()` on a background pump.
+2. Wait a **bounded collection window** (configurable; default 5s), because
+   completion cannot be detected from the stream.
+3. Call `session.Stop()` — this is what flushes the buffered events.
+4. Drain the pump with its own bounded wait, then aggregate.
+5. Validate the result is non-empty (see failure behaviour below); a window that
+   was too short shows up as an empty or implausibly small heap, and must throw
+   rather than return.
+
+`CancellationToken` is honoured by stopping the session early — the same lesson
+as `McpStdioClient`, where cancelling a blocked read did not work and the real
+bound had to come from outside.
+
+**Known limitation, recorded deliberately:** `dotnet-gcdump` completes a
+comparable collection in ~0.5s, so it clearly detects completion rather than
+waiting out a window. Its mechanism was not identified within this spike's
+timebox. A fixed window is therefore slower than necessary but correct and
+deterministic. Investigating live completion detection is a worthwhile
+follow-up optimisation, not a prerequisite.
 
 ### Failure behaviour
 
