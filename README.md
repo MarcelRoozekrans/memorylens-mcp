@@ -83,7 +83,7 @@ dotnet tool install -g MemoryLens.Mcp
 ```bash
 docker build -t memorylens-mcp .
 docker run -i --rm --pid=host --cap-add=SYS_PTRACE \
-  -v "$PWD:/workspace" -v memorylens-tools:/root/.memorylens memorylens-mcp
+  -v "$PWD:/workspace" memorylens-mcp
 ```
 
 Profiling from a container needs `ptrace` and the host PID namespace, and on
