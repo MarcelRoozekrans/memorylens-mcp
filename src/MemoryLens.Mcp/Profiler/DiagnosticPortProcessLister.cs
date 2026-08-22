@@ -20,11 +20,6 @@ public interface IDotNetProcessLister
 /// profileable processes. This is the same discovery mechanism the dotnet-* CLI
 /// diagnostic tools use.
 /// </para>
-/// <para>
-/// The alternative — asking the profiler — is not available: dotMemory Console
-/// exposes only get-snapshot, attach, start, start-net-core and recover. It has no
-/// process-listing command, so this must not depend on dotMemory being installed.
-/// </para>
 /// </summary>
 public class DiagnosticPortProcessLister : IDotNetProcessLister
 {

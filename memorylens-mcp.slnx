@@ -6,5 +6,6 @@
     <Project Path="tests/MemoryLens.Mcp.Tests/MemoryLens.Mcp.Tests.csproj" />
     <Project Path="tests/MemoryLens.Mcp.TestSupport/MemoryLens.Mcp.TestSupport.csproj" />
     <Project Path="tests/MemoryLens.Mcp.IntegrationTests/MemoryLens.Mcp.IntegrationTests.csproj" />
+    <Project Path="tests/MemoryLens.Mcp.LeakyApp/MemoryLens.Mcp.LeakyApp.csproj" />
   </Folder>
 </Solution>

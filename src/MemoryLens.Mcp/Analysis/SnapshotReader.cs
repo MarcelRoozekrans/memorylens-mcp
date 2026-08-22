@@ -2,38 +2,32 @@ using MemoryLens.Mcp.Profiler;
 
 namespace MemoryLens.Mcp.Analysis;
 
-/// <summary>
-/// Analyzes memory snapshots by running dotnet-gcdump report and parsing the output.
-/// Falls back to basic parsing of dotnet-dotmemory output if gcdump is unavailable.
-/// </summary>
-public class DotMemoryAnalyzer(IProcessRunner processRunner) : IDotMemoryAnalyzer
+public interface ISnapshotReader
 {
-    public async Task<SnapshotData> AnalyzeSnapshotAsync(string snapshotPath, CancellationToken ct = default)
+    Task<SnapshotData> ReadAsync(string idOrPath, CancellationToken ct);
+    Task<ComparisonData> CompareAsync(string beforeIdOrPath, string afterIdOrPath, CancellationToken ct);
+}
+
+/// <summary>
+/// Reads persisted snapshots and computes deltas between them. Replaces the old
+/// analyzer, which shelled out to an external tool and parsed its text output.
+/// </summary>
+public sealed class SnapshotReader(ISnapshotStore store) : ISnapshotReader
+{
+    public Task<SnapshotData> ReadAsync(string idOrPath, CancellationToken ct) =>
+        store.LoadAsync(idOrPath, ct);
+
+    public async Task<ComparisonData> CompareAsync(
+        string beforeIdOrPath, string afterIdOrPath, CancellationToken ct)
     {
-        // Try dotnet-gcdump report first (produces parseable text output)
-        var result = await processRunner.RunAsync(
-            "dotnet-gcdump", $"report \"{snapshotPath}\"", ct).ConfigureAwait(false);
-
-        if (result.ExitCode == 0 && !string.IsNullOrWhiteSpace(result.Output))
-            return GcDumpReportParser.Parse(result.Output);
-
-        // If snapshot path doesn't exist or tool fails, return empty data
-        return new SnapshotData();
-    }
-
-    public async Task<ComparisonData> CompareSnapshotsAsync(
-        string beforePath, string afterPath, CancellationToken ct = default)
-    {
-        var before = await AnalyzeSnapshotAsync(beforePath, ct).ConfigureAwait(false);
-        var after = await AnalyzeSnapshotAsync(afterPath, ct).ConfigureAwait(false);
-
-        var deltas = ComputeDeltas(before, after);
+        var before = await store.LoadAsync(beforeIdOrPath, ct).ConfigureAwait(false);
+        var after = await store.LoadAsync(afterIdOrPath, ct).ConfigureAwait(false);
 
         return new ComparisonData
         {
             Before = before,
             After = after,
-            Deltas = deltas,
+            Deltas = ComputeDeltas(before, after),
         };
     }
 
@@ -59,7 +53,6 @@ public class DotMemoryAnalyzer(IProcessRunner processRunner) : IDotMemoryAnalyze
                 BytesAfter = afterInfo?.TotalBytes ?? 0,
             };
 
-            // Only include types that actually changed
             if (delta.InstanceDelta != 0 || delta.BytesDelta != 0)
                 deltas.Add(delta);
         }

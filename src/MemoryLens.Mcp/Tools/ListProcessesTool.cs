@@ -10,8 +10,8 @@ public class ListProcessesTool(IDotNetProcessLister processLister, ProcessFilter
 {
     [McpServerTool, Description(
         "Lists running .NET processes suitable for memory profiling, discovered from " +
-        "their diagnostic IPC endpoints. Does not require dotMemory to be installed. " +
-        "Excludes IDE, tooling, and MCP server processes to prevent interference.")]
+        "their diagnostic IPC endpoints. Excludes IDE, tooling, and MCP server processes " +
+        "to prevent interference.")]
     public Task<string> list_processes(
         [Description("Optional filter to match process name")] string? filter = null,
         CancellationToken ct = default)

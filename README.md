@@ -97,7 +97,7 @@ Docker Desktop that namespace is the Linux VM rather than your desktop — see
 
 Running a filtered subset of the tests, e.g. `dotnet test --filter <name>`, will exit with code 9
 and print `error: 1, failed: 0`. That's the test project's discovery-collapse guard
-(`--minimum-expected-tests 130`) firing because the filter left fewer tests than expected — it is
+(`--minimum-expected-tests`) firing because the filter left fewer tests than expected — it is
 not a test failure, and a full `dotnet test` run is unaffected.
 
 ## dotMemory CLI Installation
