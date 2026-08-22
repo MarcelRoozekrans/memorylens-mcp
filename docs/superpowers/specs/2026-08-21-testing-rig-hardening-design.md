@@ -359,6 +359,14 @@ guard lands.
 **Phase 3 — E2E tier.** `LeakyApp`, `EndToEndTests`, `e2e.yml`. Gated on the
 licence question below.
 
+> **Phase 3 is superseded by
+> `2026-08-22-in-process-heap-collection-design.md`.** Scoping it surfaced that
+> `analyze` does not work on any machine (issue #161), and the fix moves heap
+> collection in-process via EventPipe. Two consequences for this document:
+> the licence question below is **moot** — nothing downloads dotMemory anymore —
+> and most of what Phase 3 scheduled as a nightly tier becomes hermetic enough
+> to run on every PR. Read the newer spec for the current plan.
+
 ### Phase 2 prerequisites discovered during Phase 1
 
 Phase 1 shipped as `a89a234..f0776d9`. Executing it surfaced four traps that
