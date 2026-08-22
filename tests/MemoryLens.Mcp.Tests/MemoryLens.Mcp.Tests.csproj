@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- Recalibrated from the real count: 103 tests, floor = actual - 2. -->
-    <TestingPlatformCommandLineArguments>--minimum-expected-tests 101</TestingPlatformCommandLineArguments>
+    <TestingPlatformCommandLineArguments>--minimum-expected-tests 102</TestingPlatformCommandLineArguments>
   </PropertyGroup>
 
   <ItemGroup>

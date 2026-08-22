@@ -85,7 +85,13 @@ public class AnalysisEngine
         // production code, Data stayed null, every rule took its `Data is null`
         // early-out, and the happy path answered "no memory issues found" on a leaking
         // heap -- the exact silent-wrong-answer shape this pipeline exists to eliminate.
-        var locator = context.SnapshotPath ?? context.SnapshotId;
+        // Empty is treated as absent, not as a path. A calling model routinely emits ""
+        // for an optional string, and a null-only fallback would let that skip the read
+        // entirely -- reinstating the silent "no memory issues found" this code exists
+        // to prevent, for an input that previously threw.
+        var locator = string.IsNullOrEmpty(context.SnapshotPath)
+            ? context.SnapshotId
+            : context.SnapshotPath;
 
         if (!string.IsNullOrEmpty(locator))
         {

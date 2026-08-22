@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using MemoryLens.Mcp.Analysis;
 using MemoryLens.Mcp.Config;
 using MemoryLens.Mcp.Profiler;
@@ -183,6 +183,37 @@ public class AnalyzeToolIntegrationTests
                 $"that is full of leaks. A bare snapshot id must resolve. Raw: {json}");
             Assert.True(findings.GetArrayLength() > 0);
             Assert.Equal(count, findings.GetArrayLength());
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    /// <summary>
+    /// An empty snapshotPath must behave like no snapshotPath, not like a valid one.
+    /// A calling model routinely emits "" for an optional string parameter, and a
+    /// null-only fallback lets that slip past the locator check: Data stays null,
+    /// every rule takes its early-out, and analyze answers "no memory issues found"
+    /// on a leaking heap. Before the bare-id fix this input threw; it must not have
+    /// become quieter.
+    /// </summary>
+    [Fact]
+    public async Task Analyze_WithEmptySnapshotPath_StillResolvesTheBareId()
+    {
+        var root = NewRoot();
+        try
+        {
+            var (store, id) = await SaveAsync(root, LeakyAppSnapshot(), TestContext.Current.CancellationToken);
+            var engine = new AnalysisEngine(new MemoryLensConfig(), new SnapshotReader(store));
+            var tool = new AnalyzeTool(engine);
+
+            var json = await tool.analyze(id, snapshotPath: "", ct: TestContext.Current.CancellationToken);
+
+            var doc = JsonDocument.Parse(json);
+            var count = doc.RootElement.GetProperty("count").GetInt32();
+
+            Assert.True(count > 0,
+                $"analyze('{id}', snapshotPath: \"\") reported {count} findings on a snapshot " +
+                $"full of leaks. An empty path must fall back to the id, not silently " +
+                $"skip the read. Raw: {json}");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
