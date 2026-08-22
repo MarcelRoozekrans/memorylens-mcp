@@ -123,6 +123,37 @@ public class HeapCollectorTests
         finally { if (!app.HasExited) app.Kill(entireProcessTree: true); }
     }
 
+    [Fact(Timeout = 120_000)]
+    public async Task CollectAsync_PopulatesDominantGeneration()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var app = StartLeakyApp(out var stdout, out _);
+        try
+        {
+            var pid = int.Parse((await stdout.ReadLineAsync(ct))!["READY ".Length..]);
+
+            var data = await new HeapCollector(TestTimeout).CollectAsync(pid, ct);
+
+            // Before generation tracking every type kept the -1 default. At least
+            // some of a real heap must now carry a real generation.
+            var withGeneration = data.Types.Where(t => t.DominantGeneration >= 0).ToList();
+            Assert.True(withGeneration.Count > 0,
+                "no type carried a generation; GCGenerationRange events are probably not being received");
+
+            // Generations are 0..4 (3 = LOH, 4 = POH). Anything else means the
+            // address bucketing is wrong, not merely incomplete.
+            Assert.All(data.Types, t =>
+                Assert.True(t.DominantGeneration >= -1 && t.DominantGeneration <= 4,
+                    $"{t.FullName} reported generation {t.DominantGeneration}"));
+
+            // The bulk of a live heap should map. If most types are -1 the ranges
+            // arrived but the bucketing is not matching addresses.
+            Assert.True(withGeneration.Count > data.Types.Count / 2,
+                $"only {withGeneration.Count} of {data.Types.Count} types mapped to a generation");
+        }
+        finally { if (!app.HasExited) app.Kill(entireProcessTree: true); }
+    }
+
     [Fact(Timeout = 60_000)]
     public async Task CollectAsync_DeadProcess_ThrowsHeapCollectionException()
     {

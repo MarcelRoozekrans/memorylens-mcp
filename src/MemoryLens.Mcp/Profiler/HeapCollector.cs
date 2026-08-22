@@ -49,7 +49,12 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
             new EventPipeProvider(
                 "Microsoft-Windows-DotNETRuntime",
                 EventLevel.Verbose,
-                (long)ClrTraceEventParser.Keywords.GCHeapSnapshot),
+                // GCHeapSurvivalAndMovement is what publishes GCGenerationRange, which is
+                // the only way to turn a node's address into a generation. Measured:
+                // without it GCGenerationRange fires exactly ZERO times while tens of
+                // thousands of nodes stream in carrying addresses.
+                (long)(ClrTraceEventParser.Keywords.GCHeapSnapshot
+                     | ClrTraceEventParser.Keywords.GCHeapSurvivalAndMovement)),
 
             // This is what makes events dispatch live, and it is what dotnet-gcdump
             // does. The heap dump itself finishes ~1ms after the session starts, but
@@ -81,6 +86,24 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
             var typeNames = new Dictionary<ulong, string>();
             var counts = new Dictionary<ulong, int>();
             var bytes = new Dictionary<ulong, long>();
+
+            // Generation state. Same ownership rule as the three dictionaries above:
+            // written ONLY on the pump thread, read ONLY where the pump has provably
+            // finished (the Build call at the bottom of this method). The abandoned-pump
+            // path throws before reaching either of them.
+            //
+            // Node addresses are buffered rather than bucketed as they arrive, and that
+            // is a measurement result, not a preference. GCGenerationRange fires in two
+            // bursts -- once at GC start and once at GC end -- and the GCBulkNode events
+            // land BETWEEN them (measured: ranges at dispatch index 0..4 and 22..26,
+            // nodes at 8..20). Bucketing on arrival could therefore only ever see the
+            // pre-GC layout, which labels every survivor with the generation it was in
+            // before the collection promoted it. The post-GC burst is the layout the
+            // dumped addresses actually belong to, because the heap walk runs at the end
+            // of the GC, after relocation. Buffering costs 8 bytes per live object and
+            // buys the correct answer.
+            var addresses = new Dictionary<ulong, List<ulong>>();
+            var ranges = new List<(int Generation, ulong Start, ulong End)>();
 
             // RunContinuationsAsynchronously is load-bearing, not a style choice.
             // TrySetResult below is called from inside an EventPipe callback on the
@@ -131,7 +154,19 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                         counts[n.TypeID] = c + 1;
                         bytes.TryGetValue(n.TypeID, out var b);
                         bytes[n.TypeID] = b + (long)n.Size;
+
+                        if (!addresses.TryGetValue(n.TypeID, out var addrs))
+                            addresses[n.TypeID] = addrs = [];
+                        addrs.Add(n.Address);
                     }
+                };
+
+                // Deliberately does NOT set sawAnyEvent. That flag means "heap data
+                // arrived"; a trace carrying generation ranges but no nodes is still an
+                // empty heap and must still be refused below.
+                eventSource.Clr.GCGenerationRange += e =>
+                {
+                    ranges.Add((e.Generation, e.RangeStart, e.RangeStart + e.RangeUsedLength));
                 };
 
                 // Completion, as dotnet-gcdump does it: remember the induced GC,
@@ -232,7 +267,8 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                     $"Reading the EventPipe stream from process {pid} failed: {fault.Message}", fault);
             }
 
-            // The pump is STILL RUNNING and still writing to typeNames/counts/bytes.
+            // The pump is STILL RUNNING and still writing to typeNames/counts/bytes and
+            // to the addresses/ranges collections.
             // Reading them from this thread would be an unsynchronised race against
             // Dictionary insert and resize: a reader racing a resize can throw, read a
             // torn entry, or spin forever in bucket traversal -- an unbounded hang that
@@ -286,7 +322,10 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                     $"heap walk was still in progress when the session was stopped. Refusing to " +
                     $"report a partially collected heap.");
 
-            var data = Build(typeNames, counts, bytes);
+            // Reading addresses/ranges here and only here is what keeps them safe: this
+            // point is past every abandoned-pump exit above, so the pump has finished and
+            // its writes are fenced by the await on it.
+            var data = Build(typeNames, counts, bytes, addresses, ranges);
 
             // An empty heap is never a real answer. Returning one is how a broken
             // pipeline renders as "no memory issues found" -- see issue #161.
@@ -302,17 +341,36 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
         }
     }
 
+    /// <summary>
+    /// Per-name accumulator. A class, not a tuple, because the generation histogram is
+    /// merged across every type id sharing a name and copying it per update would be
+    /// both wasteful and easy to get wrong.
+    /// </summary>
+    private sealed class TypeAccumulator
+    {
+        public int Count;
+        public long Bytes;
+
+        /// <summary>generation -> instances of this name observed in it.</summary>
+        public Dictionary<int, int> Generations { get; } = [];
+    }
+
     private static SnapshotData Build(
         Dictionary<ulong, string> typeNames,
         Dictionary<ulong, int> counts,
-        Dictionary<ulong, long> bytes)
+        Dictionary<ulong, long> bytes,
+        Dictionary<ulong, List<ulong>> addresses,
+        List<(int Generation, ulong Start, ulong End)> ranges)
     {
+        var generations = GenerationMap.Build(ranges);
+
         // Aggregate by resolved type NAME, not by type id. The CLR can report the
         // same name under more than one type id within a single dump; keying on id
         // would emit duplicate FullName rows and split a leaking type's counts
         // across them, which under-reports it -- the exact silent under-reporting
-        // this collector exists to eliminate.
-        var byName = new Dictionary<string, (int Count, long Bytes)>(StringComparer.Ordinal);
+        // this collector exists to eliminate. Generation histograms are merged the
+        // same way, so the mode is taken over the whole name, not per id.
+        var byName = new Dictionary<string, TypeAccumulator>(StringComparer.Ordinal);
 
         foreach (var (typeId, count) in counts)
         {
@@ -327,8 +385,28 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                 continue;
 
             var size = bytes.TryGetValue(typeId, out var b) ? b : 0;
-            byName.TryGetValue(name, out var acc);
-            byName[name] = (acc.Count + count, acc.Bytes + size);
+
+            if (!byName.TryGetValue(name, out var acc))
+                byName[name] = acc = new TypeAccumulator();
+
+            acc.Count += count;
+            acc.Bytes += size;
+
+            if (!addresses.TryGetValue(typeId, out var addrs))
+                continue;
+
+            foreach (var address in addrs)
+            {
+                // An address inside no reported range keeps no generation at all.
+                // Measured at roughly 2% of a live heap; guessing at those would put
+                // fabricated generations in front of the rules.
+                var gen = generations.Find(address);
+                if (gen < 0)
+                    continue;
+
+                acc.Generations.TryGetValue(gen, out var seen);
+                acc.Generations[gen] = seen + 1;
+            }
         }
 
         var types = new List<TypeInfo>(byName.Count);
@@ -356,6 +434,7 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                 IsLargeObjectHeap = isLoh,
                 ImplementsIDisposable = TypeClassifier.IsLikelyDisposable(name),
                 HasFinalizer = TypeClassifier.IsLikelyFinalizable(name),
+                DominantGeneration = DominantGeneration(acc.Generations),
             });
         }
 
@@ -369,5 +448,126 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                 LargeObjectCount = lohCount,
             },
         };
+    }
+
+    /// <summary>
+    /// The generation holding the most instances, or -1 when none of them mapped to a
+    /// reported range. Ties go to the LOWER generation, so a type split evenly between
+    /// two generations can never be talked up into looking long-lived.
+    /// </summary>
+    private static int DominantGeneration(Dictionary<int, int> histogram)
+    {
+        var best = -1;
+        var bestCount = 0;
+
+        foreach (var (generation, count) in histogram)
+        {
+            if (count > bestCount || (count == bestCount && best >= 0 && generation < best))
+            {
+                best = generation;
+                bestCount = count;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// Address to GC generation, flattened from the GCGenerationRange events into
+    /// disjoint sorted intervals so a lookup is a binary search rather than a scan over
+    /// every reported range. That matters on server GC, where the runtime reports a
+    /// range per generation per heap per burst -- dozens to hundreds of ranges against
+    /// millions of nodes.
+    /// </summary>
+    private sealed class GenerationMap
+    {
+        private readonly ulong[] _starts;
+        private readonly ulong[] _ends;
+        private readonly int[] _generations;
+
+        private GenerationMap(ulong[] starts, ulong[] ends, int[] generations)
+        {
+            _starts = starts;
+            _ends = ends;
+            _generations = generations;
+        }
+
+        public static GenerationMap Build(List<(int Generation, ulong Start, ulong End)> ranges)
+        {
+            // Cut the address space at every reported boundary, then label each resulting
+            // slice with the LAST range that covers it. Last wins because the ranges
+            // arrive in two bursts, one at GC start and one at GC end, and the node
+            // addresses in the dump are post-relocation -- so where the bursts disagree,
+            // the later one describes the heap the addresses actually came from. Slices
+            // that only an earlier burst covers still keep that burst's answer rather
+            // than falling to -1: stale information about a region the current burst no
+            // longer reports still beats no information.
+            var points = new List<ulong>(ranges.Count * 2);
+            foreach (var (_, start, end) in ranges)
+            {
+                if (end <= start)
+                    continue; // Empty regions are reported routinely and match nothing.
+
+                points.Add(start);
+                points.Add(end);
+            }
+
+            points.Sort();
+
+            var starts = new List<ulong>(points.Count);
+            var ends = new List<ulong>(points.Count);
+            var generations = new List<int>(points.Count);
+
+            for (var i = 0; i + 1 < points.Count; i++)
+            {
+                var sliceStart = points[i];
+                var sliceEnd = points[i + 1];
+                if (sliceStart == sliceEnd)
+                    continue; // Duplicate boundary; the sort leaves these adjacent.
+
+                var generation = -1;
+                for (var j = ranges.Count - 1; j >= 0; j--)
+                {
+                    var r = ranges[j];
+                    if (r.Start <= sliceStart && sliceEnd <= r.End)
+                    {
+                        generation = r.Generation;
+                        break;
+                    }
+                }
+
+                if (generation < 0)
+                    continue; // A gap between ranges. Nothing to say about it.
+
+                // Coalesce so the search array stays small when the bursts agree.
+                if (starts.Count > 0 &&
+                    ends[^1] == sliceStart &&
+                    generations[^1] == generation)
+                {
+                    ends[^1] = sliceEnd;
+                    continue;
+                }
+
+                starts.Add(sliceStart);
+                ends.Add(sliceEnd);
+                generations.Add(generation);
+            }
+
+            return new GenerationMap([.. starts], [.. ends], [.. generations]);
+        }
+
+        /// <summary>The generation containing <paramref name="address"/>, or -1.</summary>
+        public int Find(ulong address)
+        {
+            var i = Array.BinarySearch(_starts, address);
+            if (i < 0)
+            {
+                i = ~i - 1;
+                if (i < 0)
+                    return -1;
+            }
+
+            return address < _ends[i] ? _generations[i] : -1;
+        }
     }
 }
