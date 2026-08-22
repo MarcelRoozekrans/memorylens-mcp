@@ -13,8 +13,8 @@ public class SnapshotTool(IHeapCollector collector, ISnapshotStore store, Proces
         "Provide a pid. Returns a snapshot id to pass to analyze.")]
     public async Task<string> snapshot(
         [Description("Process ID to snapshot")] int? pid = null,
-        [Description("Process name to snapshot")] string? processName = null,
-        [Description("Command to launch and snapshot")] string? command = null,
+        [Description("Process name, used only to apply the profiling exclusion list")] string? processName = null,
+        [Description("Not implemented; a process id is required")] string? command = null,
         [Description("Seconds to wait before taking snapshot")] int? durationSeconds = null,
         CancellationToken ct = default)
     {

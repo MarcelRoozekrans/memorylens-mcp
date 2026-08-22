@@ -1,7 +1,7 @@
 {
   "name": "memorylens-mcp",
   "version": "1.7.2",
-  "description": "MCP server for .NET memory profiling with AI-actionable code fix suggestions — wraps JetBrains dotMemory with a heuristic-based rule engine.",
+  "description": "MCP server for .NET memory profiling with AI-actionable code fix suggestions — collects heap snapshots in-process via EventPipe.",
   "bin": {
     "memorylens-mcp": "./bin/memorylens-mcp.js"
   },
@@ -15,7 +15,7 @@
     "modelcontextprotocol",
     "memory",
     "profiling",
-    "dotmemory",
+    "eventpipe",
     "diagnostics",
     "dotnet",
     "memory-leak"
