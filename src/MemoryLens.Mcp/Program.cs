@@ -12,19 +12,13 @@ builder.Logging.AddConsole(options =>
 });
 
 builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
-builder.Services.AddHttpClient<DotMemoryAutoInstaller>();
-builder.Services.AddSingleton<IDotMemoryAutoInstaller>(sp =>
-    new DotMemoryAutoInstaller(
-        sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(DotMemoryAutoInstaller))));
-builder.Services.AddSingleton<DotMemoryToolManager>(sp => new DotMemoryToolManager(
-    sp.GetRequiredService<IProcessRunner>(),
-    sp.GetRequiredService<IDotMemoryAutoInstaller>()));
 builder.Services.AddSingleton<ProcessFilter>();
 builder.Services.AddSingleton<IDotNetProcessLister>(_ => new DiagnosticPortProcessLister());
-builder.Services.AddSingleton<SnapshotManager>();
 builder.Services.AddSingleton<MemoryLensConfig>(sp =>
     ConfigLoader.LoadFromPath(Path.Combine(Directory.GetCurrentDirectory(), ".memorylens.json")));
-builder.Services.AddSingleton<IDotMemoryAnalyzer, DotMemoryAnalyzer>();
+builder.Services.AddSingleton<IHeapCollector>(_ => new HeapCollector());
+builder.Services.AddSingleton<ISnapshotStore>(_ => new SnapshotStore());
+builder.Services.AddSingleton<ISnapshotReader, SnapshotReader>();
 builder.Services.AddSingleton<AnalysisEngine>();
 
 builder.Services

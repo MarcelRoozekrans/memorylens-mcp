@@ -6,7 +6,7 @@ using ModelContextProtocol.Server;
 namespace MemoryLens.Mcp.Tools;
 
 [McpServerToolType]
-public class CompareSnapshotsTool(SnapshotManager snapshotManager)
+public class CompareSnapshotsTool(IHeapCollector collector, ISnapshotStore store)
 {
     [McpServerTool, Description(
         "Takes two memory snapshots of a .NET process with a delay between them " +
@@ -19,11 +19,30 @@ public class CompareSnapshotsTool(SnapshotManager snapshotManager)
         [Description("Seconds to wait between before and after snapshots (default: 10)")] int? delaySeconds = null,
         CancellationToken ct = default)
     {
-        var result = await snapshotManager.CompareSnapshotsAsync(pid, processName, command, delaySeconds, ct).ConfigureAwait(false);
+        if (pid is null)
+            return Serialize(new ComparisonResult(false, null, null, null, 0,
+                "A process id is required. Use list_processes to find one."));
 
-        return JsonSerializer.Serialize(result, new JsonSerializerOptions
+        try
         {
-            WriteIndented = true
-        });
+            var beforeId = await store.SaveAsync(
+                await collector.CollectAsync(pid.Value, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
+
+            await Task.Delay(TimeSpan.FromSeconds(delaySeconds ?? 10), ct).ConfigureAwait(false);
+
+            var afterId = await store.SaveAsync(
+                await collector.CollectAsync(pid.Value, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
+
+            var paths = store as SnapshotStore;
+            return Serialize(new ComparisonResult(
+                true, afterId, paths?.PathFor(beforeId), paths?.PathFor(afterId), 2, null));
+        }
+        catch (HeapCollectionException ex)
+        {
+            return Serialize(new ComparisonResult(false, null, null, null, 0, ex.Message));
+        }
     }
+
+    private static string Serialize(ComparisonResult result) =>
+        JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
 }

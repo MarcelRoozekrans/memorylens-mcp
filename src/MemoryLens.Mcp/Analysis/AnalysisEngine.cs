@@ -7,13 +7,13 @@ namespace MemoryLens.Mcp.Analysis;
 public class AnalysisEngine
 {
     private readonly MemoryLensConfig _config;
-    private readonly IDotMemoryAnalyzer? _analyzer;
+    private readonly ISnapshotReader? _snapshots;
     private readonly List<IRule> _rules = [];
 
-    public AnalysisEngine(MemoryLensConfig config, IDotMemoryAnalyzer? analyzer = null)
+    public AnalysisEngine(MemoryLensConfig config, ISnapshotReader? snapshots = null)
     {
         _config = config;
-        _analyzer = analyzer;
+        _snapshots = snapshots;
         RegisterBuiltInRules();
     }
 
@@ -60,12 +60,12 @@ public class AnalysisEngine
     private async Task<SnapshotAnalysisContext> EnrichContextAsync(
         SnapshotAnalysisContext context, CancellationToken ct)
     {
-        if (_analyzer is null)
+        if (_snapshots is null)
             return context;
 
         if (context.IsComparison && context.BeforePath is not null && context.AfterPath is not null)
         {
-            var comparison = await _analyzer.CompareSnapshotsAsync(
+            var comparison = await _snapshots.CompareAsync(
                 context.BeforePath, context.AfterPath, ct).ConfigureAwait(false);
 
             return context with
@@ -77,7 +77,7 @@ public class AnalysisEngine
 
         if (context.SnapshotPath is not null)
         {
-            var data = await _analyzer.AnalyzeSnapshotAsync(context.SnapshotPath, ct).ConfigureAwait(false);
+            var data = await _snapshots.ReadAsync(context.SnapshotPath, ct).ConfigureAwait(false);
             return context with { Data = data };
         }
 

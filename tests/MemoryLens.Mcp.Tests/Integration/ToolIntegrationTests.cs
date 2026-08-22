@@ -165,50 +165,63 @@ public class ToolIntegrationTests
     [Fact]
     public async Task Snapshot_ReturnsJsonResult()
     {
-        var runner = new FakeProcessRunner(exitCode: 0, output: "Snapshot taken");
-        var filter = new ProcessFilter();
-        var toolManager = new FakeDotMemoryToolManager(runner);
-        var manager = new SnapshotManager(runner, filter, toolManager);
-        var tool = new SnapshotTool(manager);
+        var root = NewSnapshotRoot();
+        try
+        {
+            var collector = new FakeHeapCollector();
+            var store = new SnapshotStore(root);
+            var filter = new ProcessFilter();
+            var tool = new SnapshotTool(collector, store, filter);
 
-        var json = await tool.snapshot(pid: 1234, ct: TestContext.Current.CancellationToken);
-        var doc = JsonDocument.Parse(json);
+            var json = await tool.snapshot(pid: 1234, ct: TestContext.Current.CancellationToken);
+            var doc = JsonDocument.Parse(json);
 
-        Assert.True(doc.RootElement.TryGetProperty("Success", out var success));
-        Assert.True(success.GetBoolean());
-        Assert.True(doc.RootElement.TryGetProperty("SnapshotId", out _));
+            Assert.True(doc.RootElement.TryGetProperty("Success", out var success));
+            Assert.True(success.GetBoolean());
+            Assert.True(doc.RootElement.TryGetProperty("SnapshotId", out _));
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
 
     [Fact]
     public async Task Snapshot_ExcludedProcess_ReturnsError()
     {
-        var runner = new FakeProcessRunner(exitCode: 0, output: "");
-        var filter = new ProcessFilter();
-        var toolManager = new FakeDotMemoryToolManager(runner);
-        var manager = new SnapshotManager(runner, filter, toolManager);
-        var tool = new SnapshotTool(manager);
+        var root = NewSnapshotRoot();
+        try
+        {
+            var collector = new FakeHeapCollector();
+            var store = new SnapshotStore(root);
+            var filter = new ProcessFilter();
+            var tool = new SnapshotTool(collector, store, filter);
 
-        var json = await tool.snapshot(processName: "devenv", ct: TestContext.Current.CancellationToken);
-        var doc = JsonDocument.Parse(json);
+            var json = await tool.snapshot(pid: 1234, processName: "devenv", ct: TestContext.Current.CancellationToken);
+            var doc = JsonDocument.Parse(json);
 
-        Assert.False(doc.RootElement.GetProperty("Success").GetBoolean());
-        Assert.Contains("excluded", doc.RootElement.GetProperty("Error").GetString());
+            Assert.False(doc.RootElement.GetProperty("Success").GetBoolean());
+            Assert.Contains("excluded", doc.RootElement.GetProperty("Error").GetString());
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
 
     [Fact]
     public async Task CompareSnapshots_ReturnsComparisonResult()
     {
-        var runner = new FakeProcessRunner(exitCode: 0, output: "Before snapshot taken");
-        runner.SetNextResult(exitCode: 0, output: "After snapshot taken");
-        var filter = new ProcessFilter();
-        var toolManager = new FakeDotMemoryToolManager(runner);
-        var manager = new SnapshotManager(runner, filter, toolManager);
-        var tool = new CompareSnapshotsTool(manager);
+        var root = NewSnapshotRoot();
+        try
+        {
+            var collector = new FakeHeapCollector();
+            var store = new SnapshotStore(root);
+            var tool = new CompareSnapshotsTool(collector, store);
 
-        var json = await tool.compare_snapshots(pid: 1234, delaySeconds: 0, ct: TestContext.Current.CancellationToken);
-        var doc = JsonDocument.Parse(json);
+            var json = await tool.compare_snapshots(pid: 1234, delaySeconds: 0, ct: TestContext.Current.CancellationToken);
+            var doc = JsonDocument.Parse(json);
 
-        Assert.True(doc.RootElement.GetProperty("Success").GetBoolean());
-        Assert.Equal(2, doc.RootElement.GetProperty("SnapshotCount").GetInt32());
+            Assert.True(doc.RootElement.GetProperty("Success").GetBoolean());
+            Assert.Equal(2, doc.RootElement.GetProperty("SnapshotCount").GetInt32());
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
+
+    private static string NewSnapshotRoot() =>
+        Path.Combine(Path.GetTempPath(), "memorylens-tool-tests-" + Guid.NewGuid().ToString("N"));
 }
