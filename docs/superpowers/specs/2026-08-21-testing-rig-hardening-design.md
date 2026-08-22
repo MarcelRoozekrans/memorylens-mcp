@@ -258,6 +258,29 @@ their own repo. Reversible with `-X DELETE`.
 This is a GitHub settings change, applied as an explicit separate step rather
 than bundled into a code PR.
 
+> **Current state (2026-08-22): `enforce_admins` is `false`.** It was enabled as
+> planned when Phase 1 landed, then deliberately turned back off at the repo
+> owner's request the same day, restoring admin override on `main`.
+>
+> **This guard is therefore inert for the repo owner.** The `build` check is still
+> required and still binds every non-admin contributor, but the owner can merge a
+> red PR or push straight to `main`. That is precisely the configuration under
+> which six red commits reached `main` during the outage this document describes —
+> the check was required then too, and was bypassed.
+>
+> The immediate trigger was practical: branch protection also requires one
+> approving review, and in a single-maintainer repo the owner cannot approve their
+> own PR, so every PR was blocked. Worth noting that dropping
+> `required_approving_review_count` to `0` while keeping `enforce_admins` on would
+> have removed that friction without making the CI gate advisory — if the review
+> requirement is the real obstacle, that remains the narrower fix.
+>
+> Re-enable with:
+> ```
+> gh api -X POST repos/MarcelRoozekrans/memorylens-mcp/branches/main/protection/enforce_admins
+> ```
+> Tracked in issue #156.
+
 ## Section 4 — Fixture and shared test support
 
 ### `tests/MemoryLens.Mcp.LeakyApp`
@@ -325,7 +348,9 @@ are small, independent, and close the hole that actually cost six days — there
 no reason to hold them behind the larger build.
 
 **Phase 1 — Rig guards.** Min-test-count, SDK pin plus `global-json-file`,
-red-main alert, `enforce_admins`. Small, no new projects.
+red-main alert, `enforce_admins`. Small, no new projects. **Shipped** as #153 plus
+the settings change; note that `enforce_admins` was subsequently turned back off —
+see the current-state note in Section 3.
 
 **Phase 2 — Integration tier.** `TestSupport`, `IntegrationTests`, the `test`
 matrix job and the `build` aggregating gate. This is where #118's regression
