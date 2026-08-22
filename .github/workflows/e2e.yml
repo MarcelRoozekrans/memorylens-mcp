@@ -149,8 +149,18 @@ jobs:
             exit 1
           fi
 
-          grep -q '"get_rules"' "$out" || { echo "shim did not list tools"; exit 1; }
-          echo "the shim started the server and it answered tools/list"
+          # The same assertion the docker job makes, and for the same reason. The
+          # shim launches the PUBLISHED NuGet tool, so a weaker check ("get_rules
+          # appeared") would pass green against a stale six-tool dotMemory-era
+          # build — exactly the plausible-but-wrong green this job exists to catch.
+          for tool in snapshot compare_snapshots analyze list_processes get_rules; do
+            grep -q "\"$tool\"" "$out" || { echo "missing tool: $tool"; exit 1; }
+          done
+          if grep -q '"ensure_dotmemory"' "$out"; then
+            echo "ensure_dotmemory is back"
+            exit 1
+          fi
+          echo "all five tools present, and the removed one is absent"
 
   pack:
     runs-on: ubuntu-latest
@@ -209,4 +219,24 @@ jobs:
           else
             gh issue create --title "Nightly E2E failed" --label e2e-failure --body "$body"
             echo "Opened a new e2e-failure issue"
+          fi
+
+      # Without this the issue opened above can only ever accrue comments: it has
+      # no path to closing, so a fixed nightly stays visibly red forever. Mirrors
+      # ci.yml's recovery step, including the explicit per-job `== 'success'`
+      # conditions rather than a bare `success()`, which `always()` above defeats.
+      - name: Close the nightly-failure issue on recovery
+        if: >-
+          needs.docker.result == 'success' &&
+          needs.npm.result == 'success' &&
+          needs.pack.result == 'success'
+        run: |
+          set -euo pipefail
+          existing=$(gh issue list --label e2e-failure --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$(printf 'Nightly E2E recovered.\n\nRun: %s\n' "$RUN_URL")"
+            gh issue close "$existing"
+            echo "Closed issue #$existing"
+          else
+            echo "No open e2e-failure issue; nothing to close"
           fi

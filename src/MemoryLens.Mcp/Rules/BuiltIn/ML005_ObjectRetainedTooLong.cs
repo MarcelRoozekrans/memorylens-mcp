@@ -29,7 +29,13 @@ public class ML005_ObjectRetainedTooLong : IRule
 
         foreach (var type in context.Data.Types)
         {
-            if (type.DominantGeneration < 2)
+            // Generation 2 EXACTLY, not ">= 2". Generation 3 is the Large Object Heap
+            // and generation 4 the Pinned Object Heap; neither is "survived multiple GC
+            // cycles", which is the only thing the finding below knows how to say. A
+            // `>= 2` gate would report 60 LOH double[] as "60 instances in Gen2",
+            // duplicating ML004's LOH finding and mis-describing it. -1 (no instance
+            // mapped to a reported generation range) is excluded by the same test.
+            if (type.DominantGeneration != 2)
                 continue;
 
             if (IsExpectedLongLived(type.FullName))

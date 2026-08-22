@@ -44,9 +44,13 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
 
     // Ceiling on the node addresses buffered while bucketing generations (the note at
     // the declaration of `addresses` below explains why they have to be buffered at
-    // all). 32M addresses is 256MB of ulong, the same order as the circular buffer
-    // above, and covers any heap this tool is realistically pointed at: 32M live
-    // objects is a 1.5-3GB live set at typical object sizes.
+    // all). 32M addresses is 256MB of ulong PAYLOAD, but they live in `List<ulong>`
+    // buffers that grow geometrically, so that is not the peak: a list's capacity can
+    // be up to twice its count, which puts the backing arrays at roughly 512MB at
+    // steady state, and while a list is being doubled its old and new arrays are both
+    // live -- a transient peak of roughly 768MB. That is the same order as the
+    // circular buffer above, and the budget covers any heap this tool is realistically
+    // pointed at: 32M live objects is a 1.5-3GB live set at typical object sizes.
     //
     // Past it the collection THROWS rather than truncating. The heap walk emits nodes
     // in address order, so a truncated buffer is a spatially biased sample, and a
@@ -120,14 +124,25 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
             var addresses = new Dictionary<ulong, List<ulong>>();
             var bufferedAddresses = 0;
 
-            // Only the ranges that arrived after the LAST node event survive in here --
-            // see the GCGenerationRange handler for why.
+            // Only the single burst that followed the node events survives in here:
+            // earlier bursts are dropped when it starts, later ones are refused once it
+            // has been captured, and if no burst followed at all the whole list is
+            // discarded past the pump edge. See the GCGenerationRange handler for why.
             var ranges = new List<(int Generation, ulong Start, ulong End)>();
 
             // Pump-thread only. Set by every node event and cleared by the next range
             // event, which is what lets the range handler recognise the start of a burst
-            // that follows nodes.
+            // that follows nodes. Also read once past the pump-completion edge: if it is
+            // still set there, NO burst ever followed the nodes and whatever is in
+            // `ranges` is pre-relocation. See the read below.
             var nodesSinceLastRange = false;
+
+            // Pump-thread only, set by the same GCStop handler that signals completion.
+            // Once it is set, `ranges` is sealed -- see the GCGenerationRange handler.
+            // A plain bool rather than reading complete.Task.IsCompleted from the
+            // handler: both are written on the single dispatch thread, and this keeps
+            // the range handler off the TaskCompletionSource entirely.
+            var inducedGcStopped = false;
 
             // Written on the pump thread when the address budget is exhausted, read on
             // the caller thread beside the EventsLost guard. A flag rather than a throw
@@ -209,7 +224,7 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                 // empty heap and must still be refused below.
                 eventSource.Clr.GCGenerationRange += e =>
                 {
-                    // Keep ONLY the ranges that arrived after the last node event.
+                    // Keep ONLY the burst that followed the nodes, and nothing else.
                     //
                     // The addresses on GCBulkNode come from the end-of-GC heap walk, so
                     // they live in the POST-GC layout. A region the post-GC burst does
@@ -219,13 +234,37 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                     // moment a later one starts leaves those addresses at -1, which is
                     // the honest answer.
                     //
-                    // It also means a third burst -- a concurrent background GC
-                    // publishing its own ranges -- replaces its predecessor rather than
-                    // being merged into it.
+                    // Two mechanisms, because dropping-on-arrival alone is strictly
+                    // weaker than the rule above:
                     //
-                    // No timestamps are consulted: the reset is driven purely by having
-                    // seen a node since the previous range event, so what survives is
-                    // precisely the last group of ranges with no node between them.
+                    //  1. The reset below drops everything published before the burst
+                    //     that follows the nodes. No timestamps are consulted: it is
+                    //     driven purely by having seen a node since the previous range
+                    //     event.
+                    //
+                    //  2. The seal here stops a LATER GC's ranges being Add-ed onto that
+                    //     burst. GCBulkNode only ever comes from the induced GC's walk,
+                    //     so once that walk is over `nodesSinceLastRange` can never be
+                    //     set again and mechanism 1 is dead -- a gen-1 GC completing
+                    //     during the stop/drain window would otherwise merge its ranges
+                    //     in, and GenerationMap.Build's last-wins scan would prefer them
+                    //     for every region they overlap. That is how an object walked
+                    //     while in a gen-1 region gets labelled gen 2.
+                    //
+                    // The seal closes on the induced GC's OWN GCStop, which is what makes
+                    // it all-or-nothing rather than a mid-burst truncation: the walk's
+                    // burst is published before that GCStop is dispatched, so it is
+                    // admitted whole. If a runtime ever dispatched GCStop first the burst
+                    // would be refused whole, `nodesSinceLastRange` would still be set at
+                    // the pump edge, and the hole-(b) guard below would drop the stale
+                    // ranges too -- every address would resolve to -1. Degraded to
+                    // "unknown", never to a half-covered map. The integration test that
+                    // asserts most types carry a generation is what holds the actual
+                    // ordering honest: it fails loudly if the seal ever starts eating the
+                    // walk's own burst.
+                    if (inducedGcStopped)
+                        return;
+
                     if (nodesSinceLastRange)
                     {
                         ranges.Clear();
@@ -247,7 +286,15 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                 eventSource.Clr.GCStop += (GCEndTraceData d) =>
                 {
                     if (gcNum >= 0 && d.Count == gcNum)
+                    {
+                        // Pump-thread write, read only by the range handler on this same
+                        // thread. Set before TrySetResult so the range seal is in place
+                        // no later than the completion signal itself -- everything a
+                        // subsequent GC publishes during the stop/drain window arrives
+                        // after this point and must not join the walk's burst.
+                        inducedGcStopped = true;
                         complete.TrySetResult();
+                    }
                 };
 
                 eventSource.Process();
@@ -398,10 +445,23 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
                     $"heap walk was still in progress when the session was stopped. Refusing to " +
                     $"report a partially collected heap.");
 
-            // Reading addresses/ranges here and only here is what keeps them safe: this
-            // point is past every abandoned-pump exit above, so the pump has finished and
-            // its writes are fenced by the await on it.
-            var data = Build(typeNames, counts, bytes, addresses, ranges);
+            // Reading addresses/ranges/nodesSinceLastRange here and only here is what
+            // keeps them safe: this point is past every abandoned-pump exit above, so the
+            // pump has finished and its writes are fenced by the await on it.
+            //
+            // `nodesSinceLastRange` still being set means no range event arrived after
+            // the last node event -- i.e. NO burst followed the heap walk. Whatever
+            // survived in `ranges` is then the pre-GC burst, describing the layout the
+            // walked addresses were in BEFORE relocation, and bucketing against it would
+            // label every survivor with the generation it was promoted out of. Drop the
+            // ranges entirely instead: every address resolves to -1, which is a missing
+            // generation rather than a fabricated one. `ranges` itself is not mutated
+            // here -- it stays written-only-on-the-pump-thread.
+            var usableRanges = nodesSinceLastRange
+                ? new List<(int Generation, ulong Start, ulong End)>()
+                : ranges;
+
+            var data = Build(typeNames, counts, bytes, addresses, usableRanges);
 
             // An empty heap is never a real answer. Returning one is how a broken
             // pipeline renders as "no memory issues found" -- see issue #161.
@@ -580,12 +640,16 @@ public sealed class HeapCollector(TimeSpan? timeout = null) : IHeapCollector
             // Cut the address space at every reported boundary, then label each resulting
             // slice with the LAST range that covers it.
             //
-            // By the time this runs, `ranges` holds a single burst -- the collector drops
-            // everything published before the last node event -- so the ranges are
-            // already disjoint and last-wins is only a deterministic tie-break for a
-            // runtime that overlapped two ranges inside one burst. Nothing here reaches
-            // back to an earlier burst to fill a gap; an address the surviving burst does
-            // not cover gets -1, not a guess.
+            // By the time this runs the collector has narrowed `ranges` to the single
+            // burst that followed the heap walk: it drops everything published before
+            // that burst, seals the list against any GC that publishes after it, and
+            // empties it altogether when no burst followed the walk at all. So last-wins
+            // is only a deterministic tie-break for a runtime that overlapped two ranges
+            // inside that one burst -- it is NOT a mechanism for choosing between bursts,
+            // and it must never be asked to be one: if a second GC's ranges ever reached
+            // this method they would win every region they overlap and silently relabel
+            // the walk. Nothing here reaches back to an earlier burst to fill a gap; an
+            // address the surviving burst does not cover gets -1, not a guess.
             var points = new List<ulong>(ranges.Count * 2);
             foreach (var (_, start, end) in ranges)
             {

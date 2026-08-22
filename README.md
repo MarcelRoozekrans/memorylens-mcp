@@ -83,12 +83,19 @@ dotnet tool install -g MemoryLens.Mcp
 ```bash
 docker build -t memorylens-mcp .
 docker run -i --rm --pid=host --cap-add=SYS_PTRACE \
+  -v /tmp:/tmp \
   -v "$PWD:/workspace" memorylens-mcp
 ```
 
 Profiling from a container needs `ptrace` and the host PID namespace, and on
 Docker Desktop that namespace is the Linux VM rather than your desktop — see
 [docs/docker.md](docs/docker.md) before choosing this route.
+
+`-v /tmp:/tmp` is what makes `list_processes` return anything — the runtime's
+diagnostic sockets live in the temp directory — and it is also what keeps
+snapshots alive after `--rm`, since they are written to
+`/tmp/memorylens-snapshots` inside the container. `-v "$PWD:/workspace"` is only
+so `.memorylens.json` is picked up; nothing is written there.
 
 ## Prerequisites
 

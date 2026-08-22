@@ -9,8 +9,13 @@
 #
 #   docker build -t memorylens-mcp .
 #   docker run -i --rm --pid=host --cap-add=SYS_PTRACE \
+#     -v /tmp:/tmp \
 #     -v "$PWD:/workspace" \
 #     memorylens-mcp
+#
+# -v /tmp:/tmp is not optional in practice: it is how `list_processes` sees the
+# targets' diagnostic sockets, and it is also what keeps snapshots alive after
+# --rm (see the WORKDIR note below).
 #
 # See docs/docker.md for MCP client configuration and the caveats.
 
@@ -50,8 +55,12 @@ ENV DOTNET_NOLOGO=1 \
 # Self-contained: nothing is downloaded or installed at runtime.
 COPY --from=build /app /opt/memorylens
 
-# .memorylens.json is read from the working directory (see Program.cs), and
-# snapshots land here — mount your project so both survive the container.
+# .memorylens.json is read from the working directory (see Program.cs), so mount
+# your project here if you want the server to pick up your rule configuration.
+#
+# Snapshots do NOT land here. SnapshotStore is constructed with no root, so it
+# writes to memorylens-snapshots under Path.GetTempPath() — /tmp/memorylens-snapshots
+# unless TMPDIR is set. Mounting -v /tmp:/tmp is what makes them survive --rm.
 WORKDIR /workspace
 
 ENTRYPOINT ["dotnet", "/opt/memorylens/MemoryLens.Mcp.dll"]
