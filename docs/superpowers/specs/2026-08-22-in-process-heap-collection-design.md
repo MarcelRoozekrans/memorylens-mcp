@@ -257,12 +257,39 @@ The collector must instead:
 as `McpStdioClient`, where cancelling a blocked read did not work and the real
 bound had to come from outside.
 
-**Known limitation, recorded deliberately:** `dotnet-gcdump` completes a
-comparable collection in ~0.5s, so it clearly detects completion rather than
-waiting out a window. Its mechanism was not identified within this spike's
-timebox. A fixed window is therefore slower than necessary but correct and
-deterministic. Investigating live completion detection is a worthwhile
-follow-up optimisation, not a prerequisite.
+### Completion detection — resolved
+
+A third spike read `dotnet-gcdump`'s own implementation
+(`src/Tools/dotnet-gcdump/DotNetHeapDump/EventPipeDotNetHeapDumper.cs` in
+dotnet/diagnostics) and identified both the mechanism and the reason the
+probes above never saw events live:
+
+- **Keywords:** the composite `ClrTraceEventParser.Keywords.GCHeapSnapshot`,
+  not the individual flags assembled by hand in the probes.
+- **Buffer size: 1024 MB** in `EventPipeSessionConfiguration`. **This is the
+  cause of the probe's hang.** With the default buffer, events are not streamed
+  live and surface only when the session stops. gcdump requests a gigabyte
+  precisely so it can observe the stream in real time.
+- **Completion signal:** capture a GC number from the first `GCStart` where
+  `Depth == 2 && Type != GCType.BackgroundGC`, then treat the dump as complete
+  when a `GCStop` arrives whose `Count` equals that number.
+- **Defensive exits** around it: cancellation requested; reader task completed;
+  no EventPipe data within 5 seconds (assume the target has no .NET heap);
+  overall timeout, default 30s.
+
+**This supersedes the fixed-window design above.** The collector should use
+live completion detection, with the bounded window demoted to a backstop rather
+than the primary mechanism. The sequence becomes:
+
+1. Start the session with `GCHeapSnapshot` and a 1024 MB buffer.
+2. Pump `EventPipeEventSource.Process()` on a background task, watching
+   `GCStart` / `GCStop` for the completion condition above.
+3. On completion — or on any defensive exit — call `session.Stop()`.
+4. Drain the pump with a bounded wait, aggregate, and validate non-empty.
+
+The empty-result rule and the failure behaviour below are unchanged, and matter
+more here: a defensive exit that fires early must throw, never return a partial
+heap as if it were the answer.
 
 ### Failure behaviour
 
