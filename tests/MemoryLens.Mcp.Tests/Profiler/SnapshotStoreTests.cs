@@ -13,10 +13,28 @@ public class SnapshotStoreTests
     {
         Types =
         [
-            new TypeInfo { FullName = "System.String", InstanceCount = 1000, TotalBytes = 40000 },
-            new TypeInfo { FullName = "MyApp.Thing", InstanceCount = 7, TotalBytes = 168, ImplementsIDisposable = true },
+            new TypeInfo
+            {
+                FullName = "System.String",
+                InstanceCount = 1000,
+                TotalBytes = 40000,
+                ImplementsIDisposable = false,
+                HasFinalizer = false,
+                DominantGeneration = 2,
+                IsLargeObjectHeap = false,
+            },
+            new TypeInfo
+            {
+                FullName = "MyApp.Thing",
+                InstanceCount = 7,
+                TotalBytes = 168,
+                ImplementsIDisposable = true,
+                HasFinalizer = true,
+                DominantGeneration = 1,
+                IsLargeObjectHeap = true,
+            },
         ],
-        Heap = new HeapInfo { TotalBytes = 40168, LargeObjectHeapBytes = 0, LargeObjectCount = 0 },
+        Heap = new HeapInfo { TotalBytes = 40168, LargeObjectHeapBytes = 168, LargeObjectCount = 1 },
     };
 
     [Fact]
@@ -31,11 +49,26 @@ public class SnapshotStoreTests
             var loaded = await store.LoadAsync(id, TestContext.Current.CancellationToken);
 
             Assert.Equal(2, loaded.Types.Count);
+
             Assert.Equal("System.String", loaded.Types[0].FullName);
             Assert.Equal(1000, loaded.Types[0].InstanceCount);
             Assert.Equal(40000, loaded.Types[0].TotalBytes);
+            Assert.False(loaded.Types[0].ImplementsIDisposable);
+            Assert.False(loaded.Types[0].HasFinalizer);
+            Assert.Equal(2, loaded.Types[0].DominantGeneration);
+            Assert.False(loaded.Types[0].IsLargeObjectHeap);
+
+            Assert.Equal("MyApp.Thing", loaded.Types[1].FullName);
+            Assert.Equal(7, loaded.Types[1].InstanceCount);
+            Assert.Equal(168, loaded.Types[1].TotalBytes);
             Assert.True(loaded.Types[1].ImplementsIDisposable);
+            Assert.True(loaded.Types[1].HasFinalizer);
+            Assert.Equal(1, loaded.Types[1].DominantGeneration);
+            Assert.True(loaded.Types[1].IsLargeObjectHeap);
+
             Assert.Equal(40168, loaded.Heap.TotalBytes);
+            Assert.Equal(168, loaded.Heap.LargeObjectHeapBytes);
+            Assert.Equal(1, loaded.Heap.LargeObjectCount);
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
