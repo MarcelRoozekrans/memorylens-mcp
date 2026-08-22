@@ -62,8 +62,8 @@ public class ToolIntegrationTests
     {
         var lister = new FakeDotNetProcessLister(new DotNetProcess(1234, "MyApp.Web", ""));
 
-        // No IProcessRunner and no DotMemoryToolManager: the tool cannot reach a CLI
-        // even if one were installed.
+        // The tool's constructor takes only a process lister and a filter -- there is
+        // no external profiler dependency to install in the first place.
         var tool = new ListProcessesTool(lister, new ProcessFilter());
 
         var json = await tool.list_processes(ct: TestContext.Current.CancellationToken);
@@ -242,7 +242,8 @@ public class ToolIntegrationTests
         {
             var collector = new FakeHeapCollector();
             var store = new SnapshotStore(root);
-            var tool = new CompareSnapshotsTool(collector, store);
+            var filter = new ProcessFilter();
+            var tool = new CompareSnapshotsTool(collector, store, filter);
 
             var json = await tool.compare_snapshots(pid: 1234, delaySeconds: 0, ct: TestContext.Current.CancellationToken);
             var doc = JsonDocument.Parse(json);
@@ -261,13 +262,34 @@ public class ToolIntegrationTests
         {
             var collector = new FakeHeapCollector();
             var store = new SnapshotStore(root);
-            var tool = new CompareSnapshotsTool(collector, store);
+            var filter = new ProcessFilter();
+            var tool = new CompareSnapshotsTool(collector, store, filter);
 
             var json = await tool.compare_snapshots(ct: TestContext.Current.CancellationToken);
             var doc = JsonDocument.Parse(json);
 
             Assert.False(doc.RootElement.GetProperty("Success").GetBoolean());
             Assert.False(string.IsNullOrEmpty(doc.RootElement.GetProperty("Error").GetString()));
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task CompareSnapshots_ExcludedProcess_ReturnsError()
+    {
+        var root = NewSnapshotRoot();
+        try
+        {
+            var collector = new FakeHeapCollector();
+            var store = new SnapshotStore(root);
+            var filter = new ProcessFilter();
+            var tool = new CompareSnapshotsTool(collector, store, filter);
+
+            var json = await tool.compare_snapshots(pid: 1234, processName: "devenv", delaySeconds: 0, ct: TestContext.Current.CancellationToken);
+            var doc = JsonDocument.Parse(json);
+
+            Assert.False(doc.RootElement.GetProperty("Success").GetBoolean());
+            Assert.Contains("excluded", doc.RootElement.GetProperty("Error").GetString());
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
@@ -284,7 +306,8 @@ public class ToolIntegrationTests
         {
             var collector = new FakeHeapCollector(failureMessage: "diagnostics port unavailable");
             var store = new SnapshotStore(root);
-            var tool = new CompareSnapshotsTool(collector, store);
+            var filter = new ProcessFilter();
+            var tool = new CompareSnapshotsTool(collector, store, filter);
 
             var json = await tool.compare_snapshots(pid: 1234, delaySeconds: 0, ct: TestContext.Current.CancellationToken);
             var doc = JsonDocument.Parse(json);

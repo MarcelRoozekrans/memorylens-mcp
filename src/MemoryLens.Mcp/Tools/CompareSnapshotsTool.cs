@@ -6,7 +6,7 @@ using ModelContextProtocol.Server;
 namespace MemoryLens.Mcp.Tools;
 
 [McpServerToolType]
-public class CompareSnapshotsTool(IHeapCollector collector, ISnapshotStore store)
+public class CompareSnapshotsTool(IHeapCollector collector, ISnapshotStore store, ProcessFilter processFilter)
 {
     [McpServerTool, Description(
         "Takes two memory snapshots of a .NET process with a delay between them " +
@@ -22,6 +22,10 @@ public class CompareSnapshotsTool(IHeapCollector collector, ISnapshotStore store
         if (pid is null)
             return Serialize(new ComparisonResult(false, null, null, null, 0,
                 "A process id is required. Use list_processes to find one."));
+
+        if (processName is not null && processFilter.IsExcluded(processName, ""))
+            return Serialize(new ComparisonResult(false, null, null, null, 0,
+                $"Process '{processName}' is excluded from profiling."));
 
         try
         {

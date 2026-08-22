@@ -7,9 +7,7 @@ description: Use when performing memory analysis on .NET applications, investiga
 
 ## Prerequisites
 
-This skill requires the memorylens MCP server tools (`ensure_dotmemory`, `list_processes`, `snapshot`, `compare_snapshots`, `analyze`, `get_rules`).
-
-Check if `ensure_dotmemory` is available as an MCP tool. If not, this skill is inert — inform the user to install the memorylens plugin.
+This skill requires the memorylens MCP server tools (`list_processes`, `snapshot`, `compare_snapshots`, `analyze`, `get_rules`). Collection happens in-process over EventPipe, so there is nothing to install or verify before profiling — if the MCP tools aren't available at all, inform the user to install the memorylens plugin.
 
 ## When to Use
 
@@ -23,34 +21,29 @@ Check if `ensure_dotmemory` is available as an MCP tool. If not, this skill is i
 
 ## Workflow
 
-### Step 1: Ensure tooling
-
-Call `ensure_dotmemory`. If it fails, stop and report the error.
-
-### Step 2: Identify target
+### Step 1: Identify target
 
 Ask the user what to profile:
-- **Running process**: Call `list_processes` and let user pick. It needs no profiler,
-  so it is also safe to call before step 1 to check there is a target at all
+- **Running process**: Call `list_processes` and let user pick.
 - **Launch command**: User provides a `dotnet run` command or similar
 - **Both**: Attach to running OR launch — user's choice
 
-### Step 3: Choose profiling mode
+### Step 2: Choose profiling mode
 
 Based on the user's ask:
 - **"How does my memory look?"** → Single `snapshot`
 - **"Is there a leak?"** / **"What changed?"** → `compare_snapshots`
 - **Unclear** → Ask: "Do you want a single snapshot of current state, or a before/after comparison to detect growth?"
 
-### Step 4: Capture
+### Step 3: Capture
 
 Execute `snapshot` or `compare_snapshots` with the target parameters.
 
-### Step 5: Analyze
+### Step 4: Analyze
 
 Call `analyze` with the returned `snapshotId`. If user has a `.memorylens.json`, pass the `rulesPath`.
 
-### Step 6: Apply fixes
+### Step 5: Apply fixes
 
 For each finding with a `suggestion`:
 1. Present the finding (rule, severity, description, evidence)
@@ -60,7 +53,7 @@ For each finding with a `suggestion`:
 
 Order: critical findings first, then high, medium, low.
 
-### Step 7: Summary
+### Step 6: Summary
 
 After all findings are addressed, present a summary:
 - Total findings by severity
@@ -69,7 +62,7 @@ After all findings are addressed, present a summary:
 
 ## Integration with systematic-debugging
 
-When invoked from systematic-debugging, skip step 2 questioning — the debugger already knows the target process. Use the process context from the debugging session.
+When invoked from systematic-debugging, skip step 1 questioning — the debugger already knows the target process. Use the process context from the debugging session.
 
 **Memory smell indicators** (trigger MemoryLens from debugging):
 - `OutOfMemoryException`

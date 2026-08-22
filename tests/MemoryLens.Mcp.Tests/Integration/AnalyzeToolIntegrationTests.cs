@@ -13,8 +13,9 @@ namespace MemoryLens.Mcp.Tests.Integration;
 /// </summary>
 public class AnalyzeToolIntegrationTests
 {
-    // Fixtures are hand-built SnapshotData rather than parsed gcdump text, so these
-    // tests do not depend on GcDumpReportParser (Task 5 deletes it).
+    // Fixtures are hand-built SnapshotData rather than data parsed from an external
+    // tool's output, so these tests exercise the pipeline directly with no parser
+    // dependency.
     private static SnapshotData LeakyAppSnapshot() => new()
     {
         Types =

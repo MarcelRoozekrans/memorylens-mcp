@@ -14,8 +14,8 @@ public class AnalysisPipelineTests
 {
     /// <summary>
     /// Simulates a realistic heap from a .NET web app with memory issues. Hand-built
-    /// SnapshotData rather than parsed gcdump text, so these tests do not depend on
-    /// GcDumpReportParser (Task 5 deletes it).
+    /// SnapshotData rather than data parsed from an external tool's output, so these
+    /// tests exercise the pipeline directly and have no parser dependency.
     /// </summary>
     private static SnapshotData RealisticSnapshot() => new()
     {
