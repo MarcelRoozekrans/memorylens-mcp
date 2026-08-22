@@ -13,8 +13,22 @@ var duplicates = new List<string>();
 // ML003 / ML009: disposables that are never disposed.
 var streams = new List<MemoryStream>();
 
+// ML004 / Large Object Heap: buffers far above the 85KB LOH threshold.
+// double[] deliberately -- nothing else in this fixture allocates one. HeapCollector
+// aggregates by type NAME, so reusing a type that also has small instances would
+// drag the aggregate average back under the threshold and make the assertion
+// meaningless. 20,000 doubles is ~160KB per instance, comfortably over.
+var largeBuffers = new List<double[]>();
+
 void Grow(int tranche)
 {
+    for (var i = 0; i < 16; i++)
+    {
+        var buffer = new double[20_000];
+        buffer[0] = tranche + i; // Touch it so nothing can elide the allocation.
+        largeBuffers.Add(buffer);
+    }
+
     for (var i = 0; i < 20_000; i++)
         duplicates.Add("memorylens-leak-" + (i % 200).ToString(CultureInfo.InvariantCulture));
 
@@ -54,3 +68,4 @@ while ((line = Console.ReadLine()) is not null)
 GC.KeepAlive(retained);
 GC.KeepAlive(duplicates);
 GC.KeepAlive(streams);
+GC.KeepAlive(largeBuffers);

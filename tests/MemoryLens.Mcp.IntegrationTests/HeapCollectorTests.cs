@@ -53,6 +53,76 @@ public class HeapCollectorTests
         finally { if (!app.HasExited) app.Kill(entireProcessTree: true); }
     }
 
+    /// <summary>
+    /// Large Object Heap classification is computed inside <c>HeapCollector.Build</c>,
+    /// which is private static -- so the only honest coverage is end-to-end. The rules
+    /// that used to pin the 85KB boundary lived in a parser that no longer exists, which
+    /// left the classifier with no test at all.
+    /// </summary>
+    [Fact(Timeout = 120_000)]
+    public async Task CollectAsync_ClassifiesLargeObjectHeapTypes_AndDiscriminates()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var app = StartLeakyApp(out var stdout, out _);
+        try
+        {
+            var ready = await stdout.ReadLineAsync(ct);
+            var pid = int.Parse(ready!["READY ".Length..]);
+
+            var data = await new HeapCollector(TestTimeout).CollectAsync(pid, ct);
+
+            // The fixture retains 16 double[20_000] buffers, ~160KB each -- comfortably
+            // over the 85KB threshold -- and allocates System.Double[] nowhere else. The
+            // collector aggregates by type NAME, so a type that also had small instances
+            // would have its average dragged back under the threshold and prove nothing.
+            // Exact name, not a prefix: the List<double[]> holding them has a
+            // System.Double[][] backing store, which is a handful of small objects.
+            var doubleArrays = data.Types
+                .Where(t => string.Equals(t.FullName, "System.Double[]", StringComparison.Ordinal))
+                .ToList();
+
+            Assert.True(
+                doubleArrays.Count == 1,
+                $"expected exactly one System.Double[] row from the fixture's large buffers, saw " +
+                $"{doubleArrays.Count}. Double-ish rows present: " +
+                $"[{string.Join(", ", data.Types.Select(t => t.FullName)
+                    .Where(n => n.Contains("Double", StringComparison.Ordinal)))}]");
+
+            var large = doubleArrays[0];
+            var average = large.TotalBytes / large.InstanceCount;
+
+            Assert.True(
+                large.IsLargeObjectHeap,
+                $"{large.FullName} averages {average} bytes across {large.InstanceCount} " +
+                $"instances ({large.TotalBytes} bytes total) and must be classified as LOH");
+
+            Assert.True(
+                data.Heap.LargeObjectHeapBytes > 0,
+                $"a heap holding {large.InstanceCount} LOH-sized buffers reported " +
+                $"LargeObjectHeapBytes = {data.Heap.LargeObjectHeapBytes}");
+
+            Assert.True(
+                data.Heap.LargeObjectCount > 0,
+                $"a heap holding {large.InstanceCount} LOH-sized buffers reported " +
+                $"LargeObjectCount = {data.Heap.LargeObjectCount}");
+
+            // The classifier must discriminate, not flag everything. Strings in this
+            // fixture are tens of bytes each, three orders of magnitude under the line.
+            var strings = data.Types.Single(t => t.FullName == "System.String");
+            Assert.False(
+                strings.IsLargeObjectHeap,
+                $"System.String averages {strings.TotalBytes / strings.InstanceCount} bytes " +
+                $"and must not be classified as LOH");
+
+            // And the roll-up must be a subset of the heap, not the whole of it.
+            Assert.True(
+                data.Heap.LargeObjectHeapBytes < data.Heap.TotalBytes,
+                $"LOH bytes {data.Heap.LargeObjectHeapBytes} should be a strict subset of " +
+                $"total {data.Heap.TotalBytes}");
+        }
+        finally { if (!app.HasExited) app.Kill(entireProcessTree: true); }
+    }
+
     [Fact(Timeout = 60_000)]
     public async Task CollectAsync_DeadProcess_ThrowsHeapCollectionException()
     {
