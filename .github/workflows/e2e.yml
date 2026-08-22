@@ -33,7 +33,11 @@ jobs:
           # result actually land, so the probe waits for the answer rather than
           # racing it. No fixed sleep: the npm job's shim may spend a minute
           # installing the tool first, which any fixed delay would get wrong.
-          # The iteration cap bounds a server that never answers.
+          # The iteration cap bounds a server that never answers, but it also
+          # doubles as the "give up and release the writer anyway" deadline —
+          # so it must clear a slow-but-healthy run, not just a hung one. 300s
+          # gives several times the observed restore time while staying well
+          # inside this job's 20-minute timeout.
           work=$(mktemp -d)
           out="$work/stdout"
           err="$work/stderr"
@@ -43,7 +47,7 @@ jobs:
           # '"tools":[' is the tools/list result; the initialize response
           # carries '"tools":{' in its capabilities, so match on the bracket.
           (
-            for _ in $(seq 1 120); do
+            for _ in $(seq 1 300); do
               if grep -qF '"tools":[' "$out" 2>/dev/null; then break; fi
               sleep 1
             done
@@ -105,6 +109,11 @@ jobs:
           # the .NET global tool before the server ever reads stdin, so the
           # window between writing the requests and getting an answer is
           # dominated by a NuGet restore. Wait for the result, do not sleep.
+          # The cap below both bounds a hung server AND is the deadline at
+          # which the watcher gives up and releases the writer regardless —
+          # so on a congested runner a restore that legitimately runs long
+          # must not trip it. 300s leaves several times the observed ~1-minute
+          # restore while staying well inside this job's 20-minute timeout.
           work=$(mktemp -d)
           out="$work/stdout"
           err="$work/stderr"
@@ -112,7 +121,7 @@ jobs:
           : > "$out"
 
           (
-            for _ in $(seq 1 120); do
+            for _ in $(seq 1 300); do
               if grep -qF '"tools":[' "$out" 2>/dev/null; then break; fi
               sleep 1
             done
