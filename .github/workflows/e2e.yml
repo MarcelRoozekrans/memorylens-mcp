@@ -184,10 +184,24 @@ jobs:
           # exercises it, rather than under a friendlier set of properties.
           dotnet pack src/MemoryLens.Mcp/MemoryLens.Mcp.csproj -c Release -p:PackageVersion=9.9.9 -o ./artifacts
           cd ./artifacts
+          # Fresh extract dir: unzip -o over a stale one would leave a previous
+          # run's server.json behind and pass a package that no longer has it.
+          rm -rf extracted
           unzip -o -q MemoryLens.Mcp.9.9.9.nupkg -d extracted
-          grep -q '"version": "9.9.9"' extracted/.mcp/server.json \
-            || { echo "server.json version was not stamped:"; cat extracted/.mcp/server.json; exit 1; }
-          echo "version stamp verified"
+          # Presence is checked separately from the version. The fix for a wrong
+          # version can drop the file from the package altogether, and a lone
+          # grep reports that as "not stamped", pointing at the wrong defect.
+          if [ ! -f extracted/.mcp/server.json ]; then
+            echo "::error::.mcp/server.json is missing from the package"
+            unzip -l MemoryLens.Mcp.9.9.9.nupkg
+            exit 1
+          fi
+          if ! grep -q '"version": "9.9.9"' extracted/.mcp/server.json; then
+            echo "::error::.mcp/server.json was not stamped with 9.9.9"
+            cat extracted/.mcp/server.json
+            exit 1
+          fi
+          echo "packed server.json present and stamped 9.9.9"
 
   alert:
     needs: [docker, npm, pack]

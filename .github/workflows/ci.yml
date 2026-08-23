@@ -91,6 +91,32 @@ jobs:
         run: |
           dotnet pack src/MemoryLens.Mcp/MemoryLens.Mcp.csproj --no-build -c Release -p:PackageVersion=${{ steps.gitversion.outputs.version }} -o ./artifacts
 
+      # Guards #168 on every PR, not just in the nightly E2E. Asserts against the
+      # built .nupkg rather than the source file: the source is a committed
+      # 0.0.0 placeholder and says nothing about what shipped. Both halves are
+      # checked, because the fix for a wrong version can silently drop the file
+      # from the package entirely, which is worse than the wrong version.
+      - name: Assert the packed server.json is present and stamped
+        run: |
+          set -euo pipefail
+          VERSION='${{ steps.gitversion.outputs.version }}'
+          cd ./artifacts
+          # Fresh extract dir: unzip -o over a stale one would leave a previous
+          # run's server.json behind and pass a package that no longer has it.
+          rm -rf extracted
+          unzip -o -q "MemoryLens.Mcp.$VERSION.nupkg" -d extracted
+          if [ ! -f extracted/.mcp/server.json ]; then
+            echo "::error::.mcp/server.json is missing from the package"
+            unzip -l "MemoryLens.Mcp.$VERSION.nupkg"
+            exit 1
+          fi
+          if ! grep -q "\"version\": \"$VERSION\"" extracted/.mcp/server.json; then
+            echo "::error::.mcp/server.json was not stamped with $VERSION"
+            cat extracted/.mcp/server.json
+            exit 1
+          fi
+          echo "packed server.json present and stamped $VERSION"
+
       - name: Push to NuGet (pre-release)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

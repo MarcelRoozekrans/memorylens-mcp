@@ -11,7 +11,6 @@ builder.Logging.AddConsole(options =>
     options.LogToStandardErrorThreshold = LogLevel.Trace;
 });
 
-builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
 builder.Services.AddSingleton<ProcessFilter>();
 builder.Services.AddSingleton<IDotNetProcessLister>(_ => new DiagnosticPortProcessLister());
 builder.Services.AddSingleton<MemoryLensConfig>(sp =>
