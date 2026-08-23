@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.0.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.7.2...v2.0.0) (2026-08-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* the ensure_dotmemory MCP tool is removed. Six tools become five. Clients referencing it by name will get an unknown-tool error.
+
+### Features
+
+* collect heap data in-process, making analyze actually work (part 1) ([#163](https://github.com/MarcelRoozekrans/memorylens-mcp/issues/163)) ([ba1864e](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/ba1864eb7a4a617533bd6d424a1adaf1597ebc93))
+
+
+### Bug Fixes
+
+* treat an empty snapshotPath as absent, not as a path ([#167](https://github.com/MarcelRoozekrans/memorylens-mcp/issues/167)) ([67e0683](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/67e0683d9dc927717660d91eecc1ace8a6dc7a3b))
+
 ## [1.7.2](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.7.1...v1.7.2) (2026-08-21)
 
 
