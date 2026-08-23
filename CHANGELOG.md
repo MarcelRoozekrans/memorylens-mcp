@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.1.1](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v2.0.0...v2.1.1) (2026-08-23)
+
+
+### Features
+
+* stop claiming dotMemory, shrink the image, and make generations real (part 2) ([#169](https://github.com/MarcelRoozekrans/memorylens-mcp/issues/169)) ([494519b](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/494519b3eac1981343d389ce459f878ae7f331e7))
+
+
+### Bug Fixes
+
+* **ci:** publish to NuGet only from a release, and make main's prerelease label work ([#174](https://github.com/MarcelRoozekrans/memorylens-mcp/issues/174)) ([42f9725](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/42f972504f94ecdb90f5759050acefff579fa0d3))
+* stamp the real version into the packed server.json; delete the dead ProcessRunner ([#173](https://github.com/MarcelRoozekrans/memorylens-mcp/issues/173)) ([eb44bb1](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/eb44bb1eaecc7036c5c2b675fa692e7bf9a18832))
+
 ## [2.0.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v1.7.2...v2.0.0) (2026-08-22)
 
 

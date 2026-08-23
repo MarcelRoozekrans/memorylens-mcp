@@ -6,13 +6,13 @@
     "url": "https://github.com/MarcelRoozekrans/memorylens-mcp",
     "source": "github"
   },
-  "version": "2.0.0",
+  "version": "2.1.1",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "memorylens-mcp",
-      "version": "2.0.0",
+      "version": "2.1.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
@@ -22,7 +22,7 @@
       "registryType": "nuget",
       "registryBaseUrl": "https://api.nuget.org/v3/index.json",
       "identifier": "MemoryLens.Mcp",
-      "version": "2.0.0",
+      "version": "2.1.1",
       "runtimeHint": "dnx",
       "transport": {
         "type": "stdio"
