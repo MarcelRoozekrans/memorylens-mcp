@@ -12,11 +12,11 @@
     <ToolCommandName>memorylens-mcp</ToolCommandName>
     <PackageId>MemoryLens.Mcp</PackageId>
     <Authors>Marcel Roozekrans</Authors>
-    <Description>MCP server for .NET memory profiling — wraps JetBrains dotnet-dotmemory with heuristic-based analysis rules</Description>
+    <Description>MCP server for .NET memory profiling — collects heap snapshots in-process via EventPipe and applies a heuristic rule engine</Description>
     <PackageProjectUrl>https://github.com/MarcelRoozekrans/memorylens-mcp</PackageProjectUrl>
     <RepositoryUrl>https://github.com/MarcelRoozekrans/memorylens-mcp</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>mcp;memory;profiling;dotmemory;diagnostics;dotnet-tool</PackageTags>
+    <PackageTags>mcp;memory;profiling;eventpipe;diagnostics;dotnet-tool</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageType>DotnetTool;McpServer</PackageType>

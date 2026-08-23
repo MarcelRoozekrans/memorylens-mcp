@@ -14,8 +14,8 @@ public class CompareSnapshotsTool(IHeapCollector collector, ISnapshotStore store
         "Provide a pid. Returns the ids and paths of both snapshots.")]
     public async Task<string> compare_snapshots(
         [Description("Process ID to snapshot")] int? pid = null,
-        [Description("Process name to snapshot")] string? processName = null,
-        [Description("Command to launch and snapshot")] string? command = null,
+        [Description("Process name, used only to apply the profiling exclusion list")] string? processName = null,
+        [Description("Not implemented; a process id is required")] string? command = null,
         [Description("Seconds to wait between before and after snapshots (default: 10)")] int? delaySeconds = null,
         CancellationToken ct = default)
     {

@@ -123,6 +123,37 @@ public class HeapCollectorTests
         finally { if (!app.HasExited) app.Kill(entireProcessTree: true); }
     }
 
+    [Fact(Timeout = 120_000)]
+    public async Task CollectAsync_PopulatesDominantGeneration()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var app = StartLeakyApp(out var stdout, out _);
+        try
+        {
+            var pid = int.Parse((await stdout.ReadLineAsync(ct))!["READY ".Length..]);
+
+            var data = await new HeapCollector(TestTimeout).CollectAsync(pid, ct);
+
+            // Before generation tracking every type kept the -1 default. At least
+            // some of a real heap must now carry a real generation.
+            var withGeneration = data.Types.Where(t => t.DominantGeneration >= 0).ToList();
+            Assert.True(withGeneration.Count > 0,
+                "no type carried a generation; GCGenerationRange events are probably not being received");
+
+            // Generations are 0..4 (3 = LOH, 4 = POH). Anything else means the
+            // address bucketing is wrong, not merely incomplete.
+            Assert.All(data.Types, t =>
+                Assert.True(t.DominantGeneration >= -1 && t.DominantGeneration <= 4,
+                    $"{t.FullName} reported generation {t.DominantGeneration}"));
+
+            // The bulk of a live heap should map. If most types are -1 the ranges
+            // arrived but the bucketing is not matching addresses.
+            Assert.True(withGeneration.Count > data.Types.Count / 2,
+                $"only {withGeneration.Count} of {data.Types.Count} types mapped to a generation");
+        }
+        finally { if (!app.HasExited) app.Kill(entireProcessTree: true); }
+    }
+
     [Fact(Timeout = 60_000)]
     public async Task CollectAsync_DeadProcess_ThrowsHeapCollectionException()
     {
@@ -186,6 +217,38 @@ public class HeapCollectorTests
             Assert.All(data.Types, t => Assert.False(string.IsNullOrWhiteSpace(t.FullName)));
             Assert.All(data.Types, t => Assert.True(t.InstanceCount > 0));
             Assert.True(data.Heap.TotalBytes > 0);
+        }
+        finally { if (!app.HasExited) app.Kill(entireProcessTree: true); }
+    }
+
+    [Fact(Timeout = 120_000)]
+    public async Task CollectAsync_ClassifiesLohFromGenerationNotSize()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var app = StartLeakyApp(out var stdout, out _);
+        try
+        {
+            var pid = int.Parse((await stdout.ReadLineAsync(ct))!["READY ".Length..]);
+
+            var data = await new HeapCollector(TestTimeout).CollectAsync(pid, ct);
+
+            // Generation 3 IS the Large Object Heap. Every type that reports gen 3
+            // must be flagged, and nothing in gen 0/1 may be.
+            foreach (var t in data.Types)
+            {
+                if (t.DominantGeneration == 3)
+                    Assert.True(t.IsLargeObjectHeap, $"{t.FullName} is in gen 3 (LOH) but was not flagged");
+                if (t.DominantGeneration is 0 or 1)
+                    Assert.False(t.IsLargeObjectHeap, $"{t.FullName} is in gen {t.DominantGeneration} but was flagged as LOH");
+            }
+
+            // The fixture retains large double[]; they must land on the LOH.
+            var doubles = data.Types.SingleOrDefault(t =>
+                string.Equals(t.FullName, "System.Double[]", StringComparison.Ordinal));
+            Assert.NotNull(doubles);
+            Assert.True(doubles!.IsLargeObjectHeap,
+                $"System.Double[] averaged {doubles.TotalBytes / Math.Max(1, doubles.InstanceCount)} bytes " +
+                $"in generation {doubles.DominantGeneration} and must be on the LOH");
         }
         finally { if (!app.HasExited) app.Kill(entireProcessTree: true); }
     }

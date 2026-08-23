@@ -1,0 +1,242 @@
+name: E2E
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build the image
+        run: docker build -t memorylens-mcp:e2e .
+
+      - name: The server starts and lists exactly its five tools
+        run: |
+          set -euo pipefail
+
+          # Do NOT pipe `printf` straight into the server. printf closes the
+          # write end of the pipe the moment it returns, so the server can read
+          # EOF and shut down before its async handlers have flushed their
+          # responses — stdout then comes back empty. That reproduces against
+          # this image, and an intermittently empty nightly is worse than none.
+          #
+          # Instead the writer blocks until a watcher has seen the tools/list
+          # result actually land, so the probe waits for the answer rather than
+          # racing it. No fixed sleep: the npm job's shim may spend a minute
+          # installing the tool first, which any fixed delay would get wrong.
+          # The iteration cap bounds a server that never answers, but it also
+          # doubles as the "give up and release the writer anyway" deadline —
+          # so it must clear a slow-but-healthy run, not just a hung one. 300s
+          # gives several times the observed restore time while staying well
+          # inside this job's 20-minute timeout.
+          work=$(mktemp -d)
+          out="$work/stdout"
+          err="$work/stderr"
+          answered="$work/answered"
+          : > "$out"
+
+          # '"tools":[' is the tools/list result; the initialize response
+          # carries '"tools":{' in its capabilities, so match on the bracket.
+          (
+            for _ in $(seq 1 300); do
+              if grep -qF '"tools":[' "$out" 2>/dev/null; then break; fi
+              sleep 1
+            done
+            : > "$answered"
+          ) &
+          watcher=$!
+
+          rc=0
+          {
+            printf '%s\n' \
+              '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"e2e","version":"1"}}}' \
+              '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+              '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+            while [ ! -e "$answered" ]; do sleep 1; done
+          } | docker run -i --rm memorylens-mcp:e2e > "$out" 2>"$err" || rc=$?
+          wait "$watcher" 2>/dev/null || true
+
+          echo "--- server stderr ---"
+          cat "$err"
+          echo "--- server stdout ---"
+          cat "$out"
+
+          if [ "$rc" -ne 0 ]; then
+            echo "the server exited with $rc"
+            exit 1
+          fi
+
+          for tool in snapshot compare_snapshots analyze list_processes get_rules; do
+            grep -q "\"$tool\"" "$out" || { echo "missing tool: $tool"; exit 1; }
+          done
+          if grep -q '"ensure_dotmemory"' "$out"; then
+            echo "ensure_dotmemory is back"
+            exit 1
+          fi
+          echo "all five tools present, and the removed one is absent"
+
+  npm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: ./global.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: The npm shim starts and answers tools/list
+        run: |
+          set -euo pipefail
+
+          # Same EOF race as the docker job, and worse here: the shim installs
+          # the .NET global tool before the server ever reads stdin, so the
+          # window between writing the requests and getting an answer is
+          # dominated by a NuGet restore. Wait for the result, do not sleep.
+          # The cap below both bounds a hung server AND is the deadline at
+          # which the watcher gives up and releases the writer regardless —
+          # so on a congested runner a restore that legitimately runs long
+          # must not trip it. 300s leaves several times the observed ~1-minute
+          # restore while staying well inside this job's 20-minute timeout.
+          work=$(mktemp -d)
+          out="$work/stdout"
+          err="$work/stderr"
+          answered="$work/answered"
+          : > "$out"
+
+          (
+            for _ in $(seq 1 300); do
+              if grep -qF '"tools":[' "$out" 2>/dev/null; then break; fi
+              sleep 1
+            done
+            : > "$answered"
+          ) &
+          watcher=$!
+
+          rc=0
+          {
+            printf '%s\n' \
+              '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"e2e","version":"1"}}}' \
+              '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+              '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+            while [ ! -e "$answered" ]; do sleep 1; done
+          } | node npm/bin/memorylens-mcp.js > "$out" 2>"$err" || rc=$?
+          wait "$watcher" 2>/dev/null || true
+
+          echo "--- shim stderr ---"
+          cat "$err"
+          echo "--- shim stdout ---"
+          cat "$out"
+
+          if [ "$rc" -ne 0 ]; then
+            echo "the shim exited with $rc"
+            exit 1
+          fi
+
+          # The same assertion the docker job makes, and for the same reason. The
+          # shim launches the PUBLISHED NuGet tool, so a weaker check ("get_rules
+          # appeared") would pass green against a stale six-tool dotMemory-era
+          # build — exactly the plausible-but-wrong green this job exists to catch.
+          for tool in snapshot compare_snapshots analyze list_processes get_rules; do
+            grep -q "\"$tool\"" "$out" || { echo "missing tool: $tool"; exit 1; }
+          done
+          if grep -q '"ensure_dotmemory"' "$out"; then
+            echo "ensure_dotmemory is back"
+            exit 1
+          fi
+          echo "all five tools present, and the removed one is absent"
+
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: ./global.json
+
+      - name: Pack and assert the version stamp fired
+        run: |
+          set -euo pipefail
+          # Deliberately the same invocation release.yml uses — PackageVersion
+          # only — so the stamp is exercised exactly the way a release
+          # exercises it, rather than under a friendlier set of properties.
+          dotnet pack src/MemoryLens.Mcp/MemoryLens.Mcp.csproj -c Release -p:PackageVersion=9.9.9 -o ./artifacts
+          cd ./artifacts
+          unzip -o -q MemoryLens.Mcp.9.9.9.nupkg -d extracted
+          grep -q '"version": "9.9.9"' extracted/.mcp/server.json \
+            || { echo "server.json version was not stamped:"; cat extracted/.mcp/server.json; exit 1; }
+          echo "version stamp verified"
+
+  alert:
+    needs: [docker, npm, pack]
+    if: always() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      # `!= 'success'` rather than `== 'failure'`, matching ci.yml: a cancelled
+      # or skipped job must still alert.
+      - name: Open or update the nightly-failure issue
+        if: >-
+          needs.docker.result != 'success' ||
+          needs.npm.result != 'success' ||
+          needs.pack.result != 'success'
+        run: |
+          set -euo pipefail
+          existing=$(gh issue list --label e2e-failure --state open --json number --jq '.[0].number // empty')
+          body=$(printf 'Nightly E2E failed.\n\ndocker: %s\nnpm: %s\npack: %s\n\nRun: %s\n' \
+            "${{ needs.docker.result }}" "${{ needs.npm.result }}" "${{ needs.pack.result }}" "$RUN_URL")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+            echo "Commented on existing issue #$existing"
+          else
+            gh issue create --title "Nightly E2E failed" --label e2e-failure --body "$body"
+            echo "Opened a new e2e-failure issue"
+          fi
+
+      # Without this the issue opened above can only ever accrue comments: it has
+      # no path to closing, so a fixed nightly stays visibly red forever. Mirrors
+      # ci.yml's recovery step, including the explicit per-job `== 'success'`
+      # conditions rather than a bare `success()`, which `always()` above defeats.
+      - name: Close the nightly-failure issue on recovery
+        if: >-
+          needs.docker.result == 'success' &&
+          needs.npm.result == 'success' &&
+          needs.pack.result == 'success'
+        run: |
+          set -euo pipefail
+          existing=$(gh issue list --label e2e-failure --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$(printf 'Nightly E2E recovered.\n\nRun: %s\n' "$RUN_URL")"
+            gh issue close "$existing"
+            echo "Closed issue #$existing"
+          else
+            echo "No open e2e-failure issue; nothing to close"
+          fi

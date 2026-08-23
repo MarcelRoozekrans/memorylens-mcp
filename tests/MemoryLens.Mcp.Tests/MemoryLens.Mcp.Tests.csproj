@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <!-- Recalibrated from the real count: 103 tests, floor = actual - 2. -->
+    <!-- Recalibrated from the real count: 104 tests, floor = actual - 2. -->
     <TestingPlatformCommandLineArguments>--minimum-expected-tests 102</TestingPlatformCommandLineArguments>
   </PropertyGroup>
 

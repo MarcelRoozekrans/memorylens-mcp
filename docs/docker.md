@@ -19,24 +19,23 @@ allocate a TTY:
 docker run -i --rm --pid=host --cap-add=SYS_PTRACE \
   -v /tmp:/tmp \
   -v "$PWD:/workspace" \
-  -v memorylens-tools:/root/.memorylens \
   memorylens-mcp
 ```
 
 | Flag | Why |
 |---|---|
-| `-v /tmp:/tmp` | How the target is **found**. `list_processes` reads the diagnostic sockets the runtime writes to its temp directory, and a PID namespace does not share a filesystem — so without this the list is empty no matter what `--pid` says. |
-| `--pid=host` | How the target is **attached to**. dotMemory can only profile a process in a PID namespace it shares. |
+| `-v /tmp:/tmp` | How the target is **found**, and where snapshots **land**. `list_processes` reads the diagnostic sockets the runtime writes to its temp directory, and a PID namespace does not share a filesystem — so without this the list is empty no matter what `--pid` says. The same mount is what makes snapshots outlive the container: they are written to `/tmp/memorylens-snapshots` inside it. |
+| `--pid=host` | How the target is **attached to**. Collection attaches over EventPipe to a process's diagnostic endpoint, which requires sharing that process's PID namespace. |
 | `--cap-add=SYS_PTRACE` | Attaching needs `ptrace`, which Docker drops by default. |
-| `-v memorylens-tools:/root/.memorylens` | Persists the dotMemory CLI that `ensure_dotmemory` downloads (~hundreds of MB) so it is fetched once, not per container start. |
-| `-v "$PWD:/workspace"` | `.memorylens.json` is read from the working directory, and snapshots are written there. |
+| `-v "$PWD:/workspace"` | Optional. `/workspace` is the working directory, and `.memorylens.json` is read from there — mount your project if you want the server to pick up your rule configuration. Nothing is written to `/workspace`. |
 
 The first two are independent and both are required: sharing only `/tmp` lists
 processes you then cannot attach to, and sharing only the PID namespace attaches
 to processes you cannot discover.
 
 If the target sets `TMPDIR`, mount that directory instead — the runtime places
-the socket wherever `TMPDIR` points.
+the socket wherever `TMPDIR` points. Note that `TMPDIR` also moves where the
+server writes snapshots, since both follow the same temp-directory lookup.
 
 ## MCP client configuration
 
@@ -51,7 +50,6 @@ the socket wherever `TMPDIR` points.
         "--pid=host", "--cap-add=SYS_PTRACE",
         "-v", "/tmp:/tmp",
         "-v", "/absolute/path/to/your/repo:/workspace",
-        "-v", "memorylens-tools:/root/.memorylens",
         "memorylens-mcp"
       ]
     }
@@ -59,20 +57,16 @@ the socket wherever `TMPDIR` points.
 }
 ```
 
-## Call `ensure_dotmemory` first
+## Nothing to install
 
-The profiler is not baked into the image. `ensure_dotmemory` downloads the
-`JetBrains.dotMemory.Console.<rid>` package from nuget.org on first use and
-extracts it under `$HOME/.memorylens` — so a cold container needs network
-access, and the `/root/.memorylens` volume is what stops it re-downloading on
-every start.
+The image is self-contained: collection runs in-process over EventPipe, so
+nothing is downloaded or installed at runtime and the container needs no
+network access to work. `docker run` with the mounts above is enough —
+there's no separate setup call before `snapshot` or `analyze` will work.
 
-`list_processes` is the exception and needs no profiler — it discovers targets
-from their diagnostic sockets — so it is a good first call to confirm the mounts
-are right before paying for the download.
-
-The image is SDK-based rather than `dotnet/runtime` because `DotMemoryToolManager`
-falls back to `dotnet tool install`, which requires the SDK.
+`list_processes` is a good first call to confirm the mounts are right: it
+discovers targets from their diagnostic sockets, so an empty result means the
+`/tmp` or `--pid` mount is wrong before you try anything else.
 
 ## Windows hosts
 
@@ -95,7 +89,11 @@ docker run -i --rm -v "${PWD}:/workspace" memorylens-mcp
   Linux VM's namespace, not your desktop's, so a .NET app running natively on
   Windows or macOS is not visible. Use the [global tool](../README.md#net-global-tool)
   or [npx](../README.md#npx-any-mcp-client) install for those.
-- **Linux glibc/musl only.** dotMemory Console has no container-friendly build
-  for other platforms; set `DOTMEMORY_PATH` if you supply your own.
-- **Snapshots are container paths.** They land under `/workspace`, so mount a
-  volume there or they vanish with `--rm`.
+- **Snapshots are container paths.** They are written to
+  `memorylens-snapshots` under the container's temp directory — `/tmp/memorylens-snapshots`
+  unless `TMPDIR` is set — and the path `snapshot` returns is that container path,
+  not a host one. The `-v /tmp:/tmp` mount above is therefore doing double duty: it
+  is what keeps snapshots alive after `--rm`, on the host at
+  `/tmp/memorylens-snapshots`. Without it they vanish with the container, and a
+  second `docker run` cannot `analyze` an id captured by the first. Mounting
+  `$PWD:/workspace` does *not* preserve them — nothing is ever written there.

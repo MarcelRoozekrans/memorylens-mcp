@@ -1,8 +1,8 @@
 # memorylens-mcp
 
 npm launcher for [MemoryLens MCP](https://github.com/MarcelRoozekrans/memorylens-mcp) — on-demand
-.NET memory profiling with concrete, AI-actionable code fix suggestions, wrapping JetBrains
-dotMemory with a heuristic-based rule engine.
+.NET memory profiling with concrete, AI-actionable code fix suggestions, collecting heap
+snapshots in-process via EventPipe with nothing to install.
 
 ```bash
 npx -y memorylens-mcp
@@ -26,9 +26,8 @@ the matching version, then execs it. **The .NET 10 SDK must be on `PATH`.**
 }
 ```
 
-The server downloads and caches `dotnet-dotmemory` on first use; see the
-[main README](https://github.com/MarcelRoozekrans/memorylens-mcp#readme) for supported platforms,
-cache locations, and manual fallback discovery.
+The server collects heap data in-process over EventPipe — nothing is downloaded or installed; see the
+[main README](https://github.com/MarcelRoozekrans/memorylens-mcp#readme) for how collection works.
 
 If you already have the .NET SDK and prefer no npm indirection, install the tool directly:
 

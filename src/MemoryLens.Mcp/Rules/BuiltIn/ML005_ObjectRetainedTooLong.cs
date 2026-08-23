@@ -1,20 +1,5 @@
 namespace MemoryLens.Mcp.Rules.BuiltIn;
 
-/// <remarks>
-/// <para>
-/// <b>This rule cannot fire today.</b> It requires <c>TypeInfo.DominantGeneration</c>
-/// to be &gt;= 2, and the in-process EventPipe collector (<c>HeapCollector.Build</c>)
-/// never populates that field — every type keeps its <c>-1</c> default, so every type
-/// is skipped and the rule always returns zero findings.
-/// </para>
-/// <para>
-/// It is still registered and still listed by <c>get_rules</c>, so a user asking "is
-/// anything retained too long?" gets a confident permanent "no". Populating
-/// <c>DominantGeneration</c> needs additional EventPipe event subscriptions and is
-/// tracked as Part 2 work; it is a feature, not a fix, and is deliberately out of scope
-/// here. Until then, treat this rule's silence as "not measured", not as "nothing found".
-/// </para>
-/// </remarks>
 public class ML005_ObjectRetainedTooLong : IRule
 {
     public string Id => "ML005";
@@ -44,7 +29,13 @@ public class ML005_ObjectRetainedTooLong : IRule
 
         foreach (var type in context.Data.Types)
         {
-            if (type.DominantGeneration < 2)
+            // Generation 2 EXACTLY, not ">= 2". Generation 3 is the Large Object Heap
+            // and generation 4 the Pinned Object Heap; neither is "survived multiple GC
+            // cycles", which is the only thing the finding below knows how to say. A
+            // `>= 2` gate would report 60 LOH double[] as "60 instances in Gen2",
+            // duplicating ML004's LOH finding and mis-describing it. -1 (no instance
+            // mapped to a reported generation range) is excluded by the same test.
+            if (type.DominantGeneration != 2)
                 continue;
 
             if (IsExpectedLongLived(type.FullName))
