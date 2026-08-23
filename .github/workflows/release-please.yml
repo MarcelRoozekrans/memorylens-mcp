@@ -55,6 +55,13 @@ jobs:
         run: |
           dotnet pack src/MemoryLens.Mcp/MemoryLens.Mcp.csproj -c Release --no-build -p:PackageVersion=${{ needs.release-please.outputs.version }} -o ./nupkg
 
+      # This is now the ONLY place the project publishes to NuGet.
+      #
+      # `--skip-duplicate` is safe here and was not safe in ci.yml. Here the version
+      # comes from a release-please tag, so it is unique per release and a duplicate
+      # can only mean this workflow is being re-run after a later step failed -- the
+      # flag makes that idempotent. In ci.yml the version repeated across every main
+      # commit between releases, so the same flag silently discarded real packages.
       - name: Push to NuGet
         run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 

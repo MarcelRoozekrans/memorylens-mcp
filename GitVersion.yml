@@ -1,4 +1,4 @@
-mode: ContinuousDeployment
+deployment-mode: ContinuousDeployment
 tag-prefix: v
 major-version-bump-message: "^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\\(.*\\))?!:"
 minor-version-bump-message: "^feat(\\(.*\\))?:"

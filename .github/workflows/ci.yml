@@ -117,9 +117,23 @@ jobs:
           fi
           echo "packed server.json present and stamped $VERSION"
 
-      - name: Push to NuGet (pre-release)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      # No NuGet push here. CI packs only to prove the package builds and that the
+      # version stamp fired; publishing belongs to release-please.yml, which runs
+      # off a release-please tag.
+      #
+      # This step used to push every main commit, and it was silently lossy.
+      # GitVersion.yml labels main `alpha`, but it uses the GitVersion 5 spelling
+      # `mode:` where v6 reads `deployment-mode:`, so the label never applied and
+      # main produced plain stable versions instead of prereleases. Every commit
+      # between two releases therefore computed the SAME version, and
+      # `--skip-duplicate` turned the second and all later pushes into a no-op that
+      # reported success. Only the first commit after a release ever reached NuGet.
+      #
+      # That is how the published 2.1.0 came to declare 1.0.0 in .mcp/server.json:
+      # #169 published it before the stamp was fixed, and #173's corrected build was
+      # skipped as a duplicate. It also meant main published stable versions straight
+      # to NuGet with no tag and no release -- 2.0.1 and 2.1.0 exist on nuget.org
+      # while git tags stop at v2.0.0.
 
   alert:
     needs: [test, build]
