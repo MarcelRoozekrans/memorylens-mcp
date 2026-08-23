@@ -25,7 +25,13 @@
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
     <None Include="..\..\icon.png" Pack="true" PackagePath="\" />
-    <None Include=".mcp\server.json" Pack="true" PackagePath=".mcp\" />
+    <!--
+      Packed from the version-stamped copy under obj/, not from the tracked
+      source file. Declared here rather than inside StampMcpServerJsonVersion
+      because pack collects its file list before a target-scoped ItemGroup would
+      be seen, which silently ships a package with no .mcp/server.json at all.
+    -->
+    <None Include="$(IntermediateOutputPath)mcp/server.json" Pack="true" PackagePath=".mcp\" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,24 +41,47 @@
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.2.6" />
   </ItemGroup>
 
-  <!-- Stamp the package version into .mcp/server.json before packing -->
+  <!--
+    Pack .mcp/server.json with the real package version in it.
+
+    Two things here are deliberate and were both bugs before (#168):
+
+    1. NewVersion reads $(PackageVersion), not $(Version). Every workflow packs
+       using the `no-build` flag and `-p:PackageVersion=X`, a fresh MSBuild evaluation
+       (the `-p:Version=X` passed to the earlier build step is not in scope), so
+       $(Version) falls back to its 1.0.0 default. Reading it stamped 1.0.0 into
+       every package ever published.
+
+    2. The stamped copy is written to obj/, never back over the tracked source
+       file. Writing in place dirtied the working tree on every local `dotnet
+       pack` and would have kept doing so, more confusingly, once the version
+       became real.
+
+    The task parameter is NewVersion rather than PackageVersion on purpose: a
+    parameter named identically to the property it failed to read is what kept
+    (1) invisible for the life of the project.
+  -->
   <UsingTask TaskName="StampMcpVersion" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
     <ParameterGroup>
-      <FilePath ParameterType="System.String" Required="true" />
-      <PackageVersion ParameterType="System.String" Required="true" />
+      <SourcePath ParameterType="System.String" Required="true" />
+      <DestinationPath ParameterType="System.String" Required="true" />
+      <NewVersion ParameterType="System.String" Required="true" />
     </ParameterGroup>
     <Task>
       <Using Namespace="System.IO" />
       <Code Type="Fragment" Language="cs">
-        var content = File.ReadAllText(FilePath);
+        var content = File.ReadAllText(SourcePath);
         content = System.Text.RegularExpressions.Regex.Replace(
-            content, @"""version""\s*:\s*""[^""]*""", $@"""version"": ""{PackageVersion}""");
-        File.WriteAllText(FilePath, content);
+            content, @"""version""\s*:\s*""[^""]*""", $@"""version"": ""{NewVersion}""");
+        Directory.CreateDirectory(Path.GetDirectoryName(DestinationPath));
+        File.WriteAllText(DestinationPath, content);
       </Code>
     </Task>
   </UsingTask>
-  <Target Name="StampMcpServerJsonVersion" BeforeTargets="GenerateNuspec">
-    <StampMcpVersion FilePath="$(MSBuildProjectDirectory)/.mcp/server.json" PackageVersion="$(Version)" />
+  <Target Name="StampMcpServerJsonVersion" BeforeTargets="_GetPackageFiles;GenerateNuspec">
+    <StampMcpVersion SourcePath="$(MSBuildProjectDirectory)/.mcp/server.json"
+                     DestinationPath="$(IntermediateOutputPath)mcp/server.json"
+                     NewVersion="$(PackageVersion)" />
   </Target>
 
 </Project>
