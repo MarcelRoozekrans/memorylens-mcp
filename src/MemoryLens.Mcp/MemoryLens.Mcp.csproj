@@ -12,7 +12,7 @@
     <ToolCommandName>memorylens-mcp</ToolCommandName>
     <PackageId>MemoryLens.Mcp</PackageId>
     <Authors>Marcel Roozekrans</Authors>
-    <Description>MCP server for .NET memory profiling — collects heap snapshots in-process via EventPipe and applies a heuristic rule engine</Description>
+    <Description>MCP server for .NET memory profiling — in-process heap snapshots via EventPipe with leak heuristics</Description>
     <PackageProjectUrl>https://github.com/MarcelRoozekrans/memorylens-mcp</PackageProjectUrl>
     <RepositoryUrl>https://github.com/MarcelRoozekrans/memorylens-mcp</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

@@ -37,9 +37,21 @@ jobs:
           for attempt in $(seq 1 "$max_attempts"); do
             if ! ./mcp-publisher login github-oidc; then
               echo "::warning::OIDC login failed on attempt $attempt/$max_attempts."
-            elif ./mcp-publisher publish; then
-              echo "Published to MCP Registry on attempt $attempt."
-              exit 0
+            else
+              if ./mcp-publisher publish >publish.log 2>&1; then
+                cat publish.log
+                echo "Published to MCP Registry on attempt $attempt."
+                exit 0
+              fi
+              cat publish.log
+              # A 422 means the registry read the payload and rejected its CONTENTS
+              # (e.g. a description over the schema's 100-char cap). Time cannot fix
+              # that, so stop here. Without this check the loop reported a hard
+              # validation error as indexing lag and burned 25 min doing it.
+              if grep -q 'status 422' publish.log; then
+                echo "::error::MCP Registry rejected server.json as invalid (HTTP 422) -- see the validation errors above. This is a payload problem, not NuGet indexing lag; retrying cannot help."
+                exit 1
+              fi
             fi
             if [ "$attempt" -lt "$max_attempts" ]; then
               echo "::notice::MCP Registry publish attempt $attempt/$max_attempts failed (NuGet may still be indexing); retrying in ${delay}s"
