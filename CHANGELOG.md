@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.2](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v2.1.1...v2.1.2) (2026-08-24)
+
+
+### Bug Fixes
+
+* **ci:** shorten server.json description to the registry's 100-char cap ([#175](https://github.com/MarcelRoozekrans/memorylens-mcp/issues/175)) ([6565e65](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/6565e65edfd9ea90bf0b3c648ae48443ffc3a891))
+
 ## [2.1.1](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v2.0.0...v2.1.1) (2026-08-23)
 
 
