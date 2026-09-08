@@ -20,7 +20,7 @@
 # See docs/docker.md for MCP client configuration and the caveats.
 
 # ---------------------------------------------------------------- build -------
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 
 WORKDIR /src
 
@@ -46,7 +46,7 @@ RUN dotnet publish src/MemoryLens.Mcp/MemoryLens.Mcp.csproj \
 # The runtime image suffices: heap collection is in-process over EventPipe, so
 # nothing is installed or shelled out to at runtime. This was previously the SDK
 # image only because the deleted dotMemory installer needed `dotnet tool install`.
-FROM mcr.microsoft.com/dotnet/runtime:10.0
+FROM mcr.microsoft.com/dotnet/runtime:11.0
 
 ENV DOTNET_NOLOGO=1 \
     DOTNET_CLI_TELEMETRY_OPTOUT=1 \
