@@ -10,6 +10,3 @@ dotnet_diagnostic.MA0002.severity = none
 
 # MA0004: ConfigureAwait(false) — not needed in test code
 dotnet_diagnostic.MA0004.severity = none
-
-# HLQ005: Avoid Single() — false positive on xUnit Assert.Single(), not LINQ Single()
-dotnet_diagnostic.HLQ005.severity = none
