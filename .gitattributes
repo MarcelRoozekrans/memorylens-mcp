@@ -1,0 +1,3 @@
+# Every text file is stored and checked out with LF, on every machine, matching .editorconfig.
+# Without this, core.autocrlf decides per machine, and `dotnet format` disagrees with one side.
+* text=auto eol=lf
