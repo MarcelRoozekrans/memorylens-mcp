@@ -17,6 +17,19 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
     steps:
+      # Pushes and PRs made with GITHUB_TOKEN trigger no workflows, so bot PRs
+      # never got their required checks. A token from the release bot GitHub App
+      # acts as the App, and its pushes trigger CI like anyone else's.
+      - name: Mint a release bot token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+
       - name: Release Please
         # No `release-type` input: passing it puts the action in single-package mode,
         # where release-please-config.json is ignored entirely and its `extra-files`
@@ -26,7 +39,7 @@ jobs:
         uses: googleapis/release-please-action@v5
         id: release
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
   publish:
     needs: release-please
