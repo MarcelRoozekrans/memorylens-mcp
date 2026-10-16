@@ -225,3 +225,6 @@ ASALocalRun/
 # parent directory is excluded, so the directory itself has to be negated first.
 !npm/bin/
 npm/*.tgz
+
+# Screenshots and page snapshots the Playwright MCP server writes into the working directory.
+.playwright-mcp/
