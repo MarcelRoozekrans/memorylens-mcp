@@ -11,6 +11,7 @@
   <a href="https://www.nuget.org/packages/MemoryLens.Mcp"><img src="https://img.shields.io/nuget/dt/MemoryLens.Mcp?style=flat-square&color=green" alt="NuGet Downloads"></a>
   <a href="https://www.npmjs.com/package/memorylens-mcp"><img src="https://img.shields.io/npm/v/memorylens-mcp?style=flat-square&logo=npm&color=cb3837" alt="npm"></a>
   <a href="https://github.com/MarcelRoozekrans/memorylens-mcp/actions"><img src="https://img.shields.io/github/actions/workflow/status/MarcelRoozekrans/memorylens-mcp/ci.yml?branch=main&style=flat-square&logo=github" alt="Build Status"></a>
+  <a href="https://codecov.io/gh/MarcelRoozekrans/memorylens-mcp"><img src="https://codecov.io/gh/MarcelRoozekrans/memorylens-mcp/graph/badge.svg" alt="codecov"></a>
   <a href="https://github.com/MarcelRoozekrans/memorylens-mcp/blob/main/LICENSE"><img src="https://img.shields.io/github/license/MarcelRoozekrans/memorylens-mcp?style=flat-square" alt="License"></a>
 </p>
 
