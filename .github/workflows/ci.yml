@@ -55,7 +55,10 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           use_oidc: true
-          files: "TestResults/**/*.cobertura.xml"
+          # Microsoft.Testing.Platform writes the reports straight into TestResults. Keep the pattern
+          # one the shell can expand: the action passes an unmatched pattern on verbatim, and the
+          # Windows codecov.exe expands it into several bare arguments and rejects the upload.
+          files: "TestResults/*.cobertura.xml"
           disable_search: true   # only the files above, not every *.xml the search finds
           fail_ci_if_error: false
 
