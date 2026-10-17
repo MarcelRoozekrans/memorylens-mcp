@@ -52,7 +52,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: '!cancelled()'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           use_oidc: true
           # Microsoft.Testing.Platform writes the reports straight into TestResults. Keep the pattern
