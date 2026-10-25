@@ -185,6 +185,21 @@ Detect memory growth by comparing two snapshots taken with a delay:
 
 Claude will call `compare_snapshots` with a `delaySeconds` value (default 10 seconds) between the two captures, then analyze the diff to identify objects that grew between snapshots.
 
+## Family
+
+MemoryLens MCP is part of a small family of .NET projects for AI work:
+
+- [AI.Sentinel](https://marcelroozekrans.github.io/AI.Sentinel/): Security monitoring middleware for `IChatClient`: prompt injection, hallucination and PII detection with an audit trail.
+- [Minos.NET](https://marcelroozekrans.github.io/Minos.NET): Typed, source-generated decision questions with calibrated answers.
+- [Rag.NET](https://marcelroozekrans.github.io/Rag.NET/): A modular retrieval-augmented generation pipeline on Microsoft.Extensions.AI.
+- [Roslyn CodeLens MCP](https://github.com/MarcelRoozekrans/roslyn-codelens-mcp): Semantic .NET code intelligence for AI agents over MCP.
+
+## Built on ZeroAlloc
+
+MemoryLens MCP uses these [ZeroAlloc](https://zeroalloc.net) libraries, which are source generators and analyzers with no reflection at runtime:
+
+- [ZeroAlloc.Analyzers](https://analyzers.zeroalloc.net)
+
 ## License
 
 [MIT](LICENSE)
