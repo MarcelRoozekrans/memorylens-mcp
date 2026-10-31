@@ -1,6 +1,6 @@
 {
   "name": "memorylens",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "description": "On-demand .NET memory profiling with concrete code fix suggestions. Requires the .NET 10 SDK; the server is fetched and run on demand via dnx.",
   "author": {
     "name": "Marcel Roozekrans",
@@ -23,7 +23,7 @@
       "args": [
         "--yes",
         "--version",
-        "2.1.2",
+        "2.1.3",
         "MemoryLens.Mcp"
       ],
       "transport": "stdio"
