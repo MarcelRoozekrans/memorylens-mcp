@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.3](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v2.1.2...v2.1.3) (2026-10-31)
+
+
+### Bug Fixes
+
+* **plugin:** run the published NuGet tool through dnx ([#277](https://github.com/MarcelRoozekrans/memorylens-mcp/issues/277)) ([0da3530](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/0da35302db8ab77f2a3d8d7e6f645b9a6b8c7a34))
+
 ## [2.1.2](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v2.1.1...v2.1.2) (2026-08-24)
 
 
