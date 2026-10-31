@@ -2,16 +2,16 @@
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "memorylens-mcp",
   "description": "On-demand .NET memory profiling with concrete code fix suggestions — no profiler to install",
-  "version": "0.1.0",
+  "version": "2.1.2",
   "owner": {
     "name": "Marcel Roozekrans"
   },
   "plugins": [
     {
       "name": "memorylens",
-      "source": "./",
+      "source": "./plugins/memorylens",
       "description": "Memory profiling MCP server with built-in rules and AI-actionable code suggestions for .NET applications",
-      "version": "0.1.0",
+      "version": "2.1.2",
       "author": {
         "name": "Marcel Roozekrans"
       },

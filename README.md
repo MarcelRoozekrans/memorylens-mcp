@@ -69,9 +69,11 @@ Add to your MCP settings (`.vscode/mcp.json` or VS settings):
 
 ### Claude Code Plugin
 
-```bash
-claude install gh:MarcelRoozekrans/memorylens-mcp
 ```
+/plugin install memorylens --marketplace MarcelRoozekrans/memorylens-mcp
+```
+
+The plugin runs the NuGet tool through `dnx`, so it needs the .NET 10 SDK and nothing else.
 
 ### .NET Global Tool
 

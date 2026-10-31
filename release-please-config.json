@@ -24,6 +24,26 @@
           "type": "json",
           "path": "npm/package.json",
           "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": ".claude-plugin/marketplace.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": ".claude-plugin/marketplace.json",
+          "jsonpath": "$.plugins[0].version"
+        },
+        {
+          "type": "json",
+          "path": "plugins/memorylens/.claude-plugin/plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "plugins/memorylens/.claude-plugin/plugin.json",
+          "jsonpath": "$.mcpServers['memorylens'].args[2]"
         }
       ]
     }
