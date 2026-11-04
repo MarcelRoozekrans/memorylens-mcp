@@ -1,5 +1,12 @@
 <Project>
 
+  <!-- NuGetAudit as ci-baseline runs it, so a local restore shows the same advisories as CI. -->
+  <PropertyGroup>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>moderate</NuGetAuditLevel>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Meziantou.Analyzer" Version="3.0.320">
       <PrivateAssets>all</PrivateAssets>

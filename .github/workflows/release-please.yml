@@ -91,6 +91,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # A CycloneDX SBOM of the solution, attached to the same release. release-please created the release in the job
+      # before, and this job runs on main, so the tag comes from release-please's output, not from github.ref_name.
+      - name: Attach the SBOM to the GitHub release
+        uses: MarcelRoozekrans/ci-baseline/actions/sbom@v1
+        with:
+          solution: memorylens-mcp.slnx
+          tag: ${{ needs.release-please.outputs.tag_name }}
+
   publish-mcp-registry:
     name: Publish to MCP Registry
     needs: [release-please, publish]
