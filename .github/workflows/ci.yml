@@ -50,6 +50,14 @@ jobs:
         # One Cobertura file per test app; Codecov merges them and the three OS legs.
         run: dotnet test --no-build -c Release --coverage --coverage-output-format cobertura --coverage-settings coverage.config.xml --results-directory TestResults
 
+      # Merges the Cobertura reports and fails below the line-coverage floor, or when codecov.yml would let a drop in
+      # coverage pass quietly. Linux leg only: ci-baseline's coverage gate runs on Linux runners only.
+      - name: Coverage gate
+        if: runner.os == 'Linux'
+        uses: MarcelRoozekrans/ci-baseline/actions/coverage-gate@v1
+        with:
+          reports: TestResults/*.cobertura.xml
+
       - name: Upload coverage to Codecov
         if: '!cancelled()'
         uses: codecov/codecov-action@v7
