@@ -45,6 +45,9 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v7
 
@@ -75,8 +78,18 @@ jobs:
       # can only mean this workflow is being re-run after a later step failed -- the
       # flag makes that idempotent. In ci.yml the version repeated across every main
       # commit between releases, so the same flag silently discarded real packages.
+      #
+      # Trusted publishing: nuget.org holds a policy for this repository and workflow file, and
+      # NuGet/login swaps this job's OIDC token for an API key that lasts about an hour.
+      # NUGET_USER is the nuget.org profile name.
+      - name: Log in to NuGet
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       - name: Push to NuGet
-        run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
       # The npm package is a launcher that installs the NuGet tool at a matching
       # version, so it must be published after the NuGet push, never before.
