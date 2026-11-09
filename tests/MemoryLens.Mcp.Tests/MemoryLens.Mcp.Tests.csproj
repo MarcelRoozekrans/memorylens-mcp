@@ -15,7 +15,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="xunit.v3" Version="4.0.2" />
+    <PackageReference Include="xunit.v3" Version="4.0.3" />
     <!-- Code coverage for the Microsoft.Testing.Platform runner. CI runs dotnet test
          with the coverage options and uploads the Cobertura report to Codecov. -->
     <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
