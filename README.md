@@ -48,7 +48,7 @@ A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/marcel
 ```
 
 The npm package ships no server code — it is a launcher that installs the `MemoryLens.Mcp` .NET
-global tool at a matching version and execs it, so the **.NET 11 SDK must be on `PATH`**.
+global tool at a matching version and execs it, so the **.NET 10 or 11 SDK must be on `PATH`**.
 Subsequent starts skip the install entirely and work offline.
 
 ### VS Code / Visual Studio (via dnx)
@@ -73,7 +73,7 @@ Add to your MCP settings (`.vscode/mcp.json` or VS settings):
 /plugin install memorylens --marketplace MarcelRoozekrans/memorylens-mcp
 ```
 
-The plugin runs the NuGet tool through `dnx`, so it needs the .NET 11 SDK and nothing else.
+The plugin runs the NuGet tool through `dnx`, so it needs the .NET 10 or 11 SDK and nothing else.
 
 ### .NET Global Tool
 
@@ -102,7 +102,7 @@ so `.memorylens.json` is picked up; nothing is written there.
 
 ## Prerequisites
 
-- [.NET 11 SDK](https://dotnet.microsoft.com/download/dotnet/11.0), 11.0.1xx feature band (pinned in `global.json`)
+- [.NET 10 or 11 SDK](https://dotnet.microsoft.com/download). `global.json` pins the 11.0 SDK; the tool targets both net10.0 and net11.0
 
 Running a filtered subset of the tests, e.g. `dotnet test --filter <name>`, will exit with code 9
 and print `error: 1, failed: 0`. That's the test project's discovery-collapse guard

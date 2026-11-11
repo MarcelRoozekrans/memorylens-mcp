@@ -112,7 +112,7 @@ function launch() {
 
 if (!hasDotnet()) {
   fail(
-    "the .NET SDK was not found on PATH. MemoryLens requires the .NET 11 SDK — https://dotnet.microsoft.com/download"
+    "the .NET SDK was not found on PATH. MemoryLens requires the .NET 10 or 11 SDK — https://dotnet.microsoft.com/download"
   );
 }
 

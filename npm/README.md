@@ -10,7 +10,7 @@ npx -y memorylens-mcp
 
 This package contains no server code. It is a thin shim that ensures the
 [`MemoryLens.Mcp`](https://www.nuget.org/packages/MemoryLens.Mcp) .NET global tool is installed at
-the matching version, then execs it. **The .NET 11 SDK must be on `PATH`.**
+the matching version, then execs it. **The .NET 10 or 11 SDK must be on `PATH`.**
 
 ## MCP client config
 

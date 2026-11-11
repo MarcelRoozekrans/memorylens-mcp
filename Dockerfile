@@ -39,6 +39,7 @@ RUN dotnet restore src/MemoryLens.Mcp/MemoryLens.Mcp.csproj
 COPY src/ src/
 RUN dotnet publish src/MemoryLens.Mcp/MemoryLens.Mcp.csproj \
       --configuration Release \
+      --framework net11.0 \
       --no-restore \
       --output /app
 
@@ -46,6 +47,8 @@ RUN dotnet publish src/MemoryLens.Mcp/MemoryLens.Mcp.csproj \
 # The runtime image suffices: heap collection is in-process over EventPipe, so
 # nothing is installed or shelled out to at runtime. This was previously the SDK
 # image only because the deleted dotMemory installer needed `dotnet tool install`.
+# The project multi-targets net10.0 and net11.0 for the NuGet tool; the publish
+# step above picks net11.0 to match this runtime.
 FROM mcr.microsoft.com/dotnet/runtime:11.0
 
 ENV DOTNET_NOLOGO=1 \
