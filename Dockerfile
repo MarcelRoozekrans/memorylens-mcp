@@ -27,9 +27,9 @@ WORKDIR /src
 # Restore against the project file alone so the (slow) restore layer survives
 # source-only edits. Directory.Build.props carries the shared analyzer set.
 #
-# global.json is deliberately NOT copied in: it pins 10.0.400 with
-# rollForward: latestPatch, and the floating sdk:10.0 tag above will
-# eventually roll forward to a 10.0.5xx feature band. Copying the pin in
+# global.json is deliberately NOT copied in: it pins 11.0.100 with
+# rollForward: latestPatch, and the floating sdk:11.0 tag above will
+# eventually roll forward to a later feature band. Copying the pin in
 # would then hard-break the build ("compatible SDK version not found")
 # instead of just picking up the newer SDK, as it does today.
 COPY Directory.Build.props ./
@@ -39,6 +39,7 @@ RUN dotnet restore src/MemoryLens.Mcp/MemoryLens.Mcp.csproj
 COPY src/ src/
 RUN dotnet publish src/MemoryLens.Mcp/MemoryLens.Mcp.csproj \
       --configuration Release \
+      --framework net11.0 \
       --no-restore \
       --output /app
 
@@ -46,6 +47,8 @@ RUN dotnet publish src/MemoryLens.Mcp/MemoryLens.Mcp.csproj \
 # The runtime image suffices: heap collection is in-process over EventPipe, so
 # nothing is installed or shelled out to at runtime. This was previously the SDK
 # image only because the deleted dotMemory installer needed `dotnet tool install`.
+# The project multi-targets net10.0 and net11.0 for the NuGet tool; the publish
+# step above picks net11.0 to match this runtime.
 FROM mcr.microsoft.com/dotnet/runtime:11.0
 
 ENV DOTNET_NOLOGO=1 \
