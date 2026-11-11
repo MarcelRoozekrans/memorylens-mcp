@@ -20,6 +20,9 @@
     "dotnet",
     "memory-leak"
   ],
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
   "license": "MIT",
   "author": "Marcel Roozekrans",
   "homepage": "https://github.com/MarcelRoozekrans/memorylens-mcp#readme",

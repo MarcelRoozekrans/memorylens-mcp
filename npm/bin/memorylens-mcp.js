@@ -19,6 +19,13 @@ const PACKAGE_ID = "MemoryLens.Mcp";
 const COMMAND = "memorylens-mcp";
 const { version } = require("../package.json");
 
+// The SDK checks and the tool install must not depend on the directory the client
+// started us in: a global.json there can pin an SDK that is not installed, which
+// makes `dotnet --version` fail even though another SDK is present. Run them from the
+// home directory instead. The server itself still starts in the caller's working
+// directory (launch() does not set a cwd), because it reads .memorylens.json from it.
+const SDK_CWD = os.homedir();
+
 function fail(message) {
   process.stderr.write(`memorylens-mcp: ${message}\n`);
   process.exit(1);
@@ -26,7 +33,7 @@ function fail(message) {
 
 function hasDotnet() {
   try {
-    execFileSync("dotnet", ["--version"], { stdio: "ignore" });
+    execFileSync("dotnet", ["--version"], { stdio: "ignore", cwd: SDK_CWD });
     return true;
   } catch {
     return false;
@@ -41,6 +48,7 @@ function installedVersion() {
     const output = execFileSync("dotnet", ["tool", "list", "--global"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
+      cwd: SDK_CWD,
     });
     for (const line of output.split("\n")) {
       const match = line.match(/^memorylens\.mcp\s+(\S+)/i);
@@ -65,7 +73,7 @@ function install(alreadyInstalled) {
   execFileSync(
     "dotnet",
     ["tool", verb, "--global", PACKAGE_ID, "--version", version],
-    { stdio: ["ignore", 2, 2] }
+    { stdio: ["ignore", 2, 2], cwd: SDK_CWD }
   );
 }
 

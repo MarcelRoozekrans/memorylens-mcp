@@ -102,7 +102,14 @@ so `.memorylens.json` is picked up; nothing is written there.
 
 ## Prerequisites
 
-- [.NET 10 or 11 SDK](https://dotnet.microsoft.com/download). `global.json` pins the 11.0 SDK; the tool targets both net10.0 and net11.0
+To run the published tool (`dnx`, `dotnet tool install`, the npm launcher):
+
+- The [.NET 10 or 11 SDK](https://dotnet.microsoft.com/download). The package ships both `net10.0` and `net11.0` builds.
+
+To build and test from a checkout:
+
+- The [.NET 11 SDK](https://dotnet.microsoft.com/download/dotnet/11.0), 11.0.1xx feature band: `global.json` pins 11.0.100 with `latestPatch`, and SDK 10 alone cannot build the `net11.0` target.
+- The .NET 10 runtime as well, because the tests run on both `net10.0` and `net11.0`.
 
 Running a filtered subset of the tests, e.g. `dotnet test --filter <name>`, will exit with code 9
 and print `error: 1, failed: 0`. That's the test project's discovery-collapse guard
