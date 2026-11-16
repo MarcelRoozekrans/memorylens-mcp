@@ -77,7 +77,7 @@ dotnet test -c Release --project tests/MemoryLens.Mcp.Tests -f net11.0 --filter-
 
 - A filtered run exits with code 9 although every test passed. Each test project sets
   `--minimum-expected-tests` through `TestingPlatformCommandLineArguments`, and a filter leaves fewer
-  tests than that floor. Check that `total:` is above 0 and `failed:` is 0; any exit code other than 9 is a real failure. A full run is unaffected.
+  tests than that floor. Check that `total:` is above 0 and `failed:` is 0; exit code 0 or 9 is then a pass, any other code a real failure. A full run is unaffected.
   Recalibrate a floor to the real count minus 2 when tests change: 102 unit, 16 integration.
 - The integration tests start real server processes, and `Host.CreateApplicationBuilder` watches its
   config files with one inotify instance each. On a machine near its inotify limit (Linux default 128)
