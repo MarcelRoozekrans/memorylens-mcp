@@ -52,7 +52,7 @@ dotnet build --no-restore -c Release -p:Version=$VERSION
 rm -rf artifacts
 dotnet pack src/MemoryLens.Mcp/MemoryLens.Mcp.csproj --no-build -c Release -p:PackageVersion=$VERSION -o ./artifacts
 unzip -o -q "artifacts/MemoryLens.Mcp.$VERSION.nupkg" -d artifacts/extracted
-grep "\"version\": \"$VERSION\"" artifacts/extracted/.mcp/server.json
+jq -e --arg v "$VERSION" '[.version, .packages[].version] | all(. == $v)' artifacts/extracted/.mcp/server.json
 ```
 
 CI job `pack` in `.github/workflows/e2e.yml` (nightly) asserts the same stamp with a fixed version:
@@ -61,7 +61,7 @@ CI job `pack` in `.github/workflows/e2e.yml` (nightly) asserts the same stamp wi
 rm -rf artifacts
 dotnet pack src/MemoryLens.Mcp/MemoryLens.Mcp.csproj -c Release -p:PackageVersion=9.9.9 -o ./artifacts
 unzip -o -q artifacts/MemoryLens.Mcp.9.9.9.nupkg -d artifacts/extracted
-grep '"version": "9.9.9"' artifacts/extracted/.mcp/server.json
+jq -e --arg v 9.9.9 '[.version, .packages[].version] | all(. == $v)' artifacts/extracted/.mcp/server.json
 ```
 
 CI jobs `docker` and `npm` in `e2e.yml` are nightly smoke tests that list the five tools. The
@@ -77,7 +77,7 @@ dotnet test -c Release --project tests/MemoryLens.Mcp.Tests -f net11.0 --filter-
 
 - A filtered run exits with code 9 although every test passed. Each test project sets
   `--minimum-expected-tests` through `TestingPlatformCommandLineArguments`, and a filter leaves fewer
-  tests than that floor. Read the `failed:` total, not the exit code. A full run is unaffected.
+  tests than that floor. Check that `total:` is above 0 and `failed:` is 0; any exit code other than 9 is a real failure. A full run is unaffected.
   Recalibrate a floor to the real count minus 2 when tests change: 102 unit, 16 integration.
 - The integration tests start real server processes, and `Host.CreateApplicationBuilder` watches its
   config files with one inotify instance each. On a machine near its inotify limit (Linux default 128)
