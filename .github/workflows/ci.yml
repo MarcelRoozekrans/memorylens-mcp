@@ -136,7 +136,9 @@ jobs:
             unzip -l "MemoryLens.Mcp.$VERSION.nupkg"
             exit 1
           fi
-          if ! grep -q "\"version\": \"$VERSION\"" extracted/.mcp/server.json; then
+          # Every version field: the top-level one and each package's. A grep for one
+          # match would pass with the package versions still at 0.0.0.
+          if ! jq -e --arg v "$VERSION" '[.version, .packages[].version] | all(. == $v)' extracted/.mcp/server.json >/dev/null; then
             echo "::error::.mcp/server.json was not stamped with $VERSION"
             cat extracted/.mcp/server.json
             exit 1
