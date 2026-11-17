@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.1](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v2.2.0...v2.2.1) (2026-11-17)
+
+
+### Bug Fixes
+
+* embed PDBs so Go to Definition shows the package source ([c29a055](https://github.com/MarcelRoozekrans/memorylens-mcp/commit/c29a055cca89ab1fcfe935cf4494a63a329607fd))
+
 ## [2.2.0](https://github.com/MarcelRoozekrans/memorylens-mcp/compare/v2.1.3...v2.2.0) (2026-11-11)
 
 
